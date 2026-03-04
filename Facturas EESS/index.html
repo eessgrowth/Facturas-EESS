@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard de Facturas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg"></div>
+    <main class="container">
+      <header class="hero">
+        <p class="eyebrow">Facturación EESS Paid Media</p>
+        <h1>Detalle de Facturas por Mes</h1>
+        <p class="subtitle">
+          Visualiza inversión total, filtra por proveedor/mes/marca y descarga cada respaldo.
+        </p>
+      </header>
+
+      <section class="kpi-grid" id="kpi-grid">
+        <article class="kpi-card">
+          <p>Consolidado</p>
+          <h2 id="kpi-total">$0</h2>
+        </article>
+        <article class="kpi-card">
+          <p>Total Meta</p>
+          <h2 id="kpi-meta">$0</h2>
+        </article>
+        <article class="kpi-card">
+          <p>Total Google Ads</p>
+          <h2 id="kpi-google">$0</h2>
+        </article>
+        <article class="kpi-card">
+          <p>Total Agencia Zeppelin</p>
+          <h2 id="kpi-zeppelin">$0</h2>
+        </article>
+      </section>
+
+      <section class="panel filters">
+        <div class="filter-field">
+          <label>Proveedor</label>
+          <div id="platform-filter" class="multiselect"></div>
+        </div>
+        <div class="filter-field">
+          <label>Mes</label>
+          <div id="month-filter" class="multiselect"></div>
+        </div>
+        <div class="filter-field">
+          <label>Marca</label>
+          <div id="brand-filter" class="multiselect"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Detalle de Facturas</h3>
+          <p id="results-count">0 facturas</p>
+        </div>
+        <div id="invoices-list" class="invoice-list"></div>
+      </section>
+    </main>
+
+    <script src="./data/invoices.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

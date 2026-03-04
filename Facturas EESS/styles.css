@@ -1,0 +1,376 @@
+:root {
+  --bg-0: #f2f2f2;
+  --bg-1: #dfdfdf;
+  --ink: #141414;
+  --muted: #525252;
+  --card: #ffffff;
+  --line: #cccccc;
+  --accent: #1f1f1f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--bg-0);
+}
+
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 0% 0%, #ffffff 0%, transparent 42%),
+    radial-gradient(circle at 100% 30%, #d9d9d9 0%, transparent 36%),
+    linear-gradient(135deg, var(--bg-0), var(--bg-1));
+}
+
+.container {
+  width: min(1180px, 92vw);
+  margin: 38px auto 56px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.subtitle {
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.kpi-grid {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.kpi-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.kpi-card h2 {
+  margin: 8px 0 0;
+  font-size: clamp(1.35rem, 2vw, 2rem);
+}
+
+.panel {
+  margin-top: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  backdrop-filter: blur(6px);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-field label {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.multiselect {
+  position: relative;
+}
+
+.multiselect-btn {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.multiselect-btn:focus-visible {
+  outline: 2px solid #7d7d7d;
+  outline-offset: 1px;
+}
+
+.multiselect-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.multiselect-caret {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.multiselect-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px;
+  z-index: 20;
+  display: none;
+}
+
+.multiselect.open .multiselect-menu {
+  display: block;
+}
+
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.multiselect-option:hover {
+  background: #f5f5f5;
+}
+
+.multiselect-option input {
+  accent-color: #242424;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.panel-head h3 {
+  margin: 0;
+}
+
+.panel-head p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.invoice-list {
+  display: grid;
+  gap: 10px;
+}
+
+.invoice {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.invoice-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff, #f1f1f1);
+}
+
+.invoice-head h4 {
+  margin: 0;
+}
+
+.invoice-meta {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.chip-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  font-size: 0.72rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 3px 8px;
+  color: var(--muted);
+}
+
+.chip.platform-meta {
+  border-color: #a8bdd8;
+  color: #184a82;
+  background: #e9f1fb;
+}
+
+.chip.platform-google {
+  border-color: #a8cfb3;
+  color: #1f5f32;
+  background: #e8f5ec;
+}
+
+.chip.platform-zeppelin {
+  border-color: #2f2f2f;
+  color: #ffffff;
+  background: #1f1f1f;
+}
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 8px 12px;
+  text-decoration: none;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #3b3b3b);
+  white-space: nowrap;
+}
+
+.invoice-body {
+  padding: 10px 12px 12px;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.summary-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.summary-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.summary-item strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.94rem;
+}
+
+.details {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+details summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 12px;
+  font-weight: 600;
+  background: #efefef;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+th,
+td {
+  padding: 8px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #f5f5f5;
+}
+
+td.amount,
+th.amount {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.note {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f2f2f2;
+  border: 1px solid #d0d0d0;
+  color: #424242;
+  font-size: 0.8rem;
+}
+
+.empty {
+  padding: 18px 8px;
+  color: var(--muted);
+}
+
+@media (max-width: 920px) {
+  .kpi-grid,
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-head {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+    text-align: center;
+  }
+}
