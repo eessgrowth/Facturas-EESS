@@ -89,7 +89,7 @@ body {
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
 }
 
@@ -102,6 +102,11 @@ body {
 .filter-field label {
   font-size: 0.84rem;
   color: var(--muted);
+}
+
+.filter-actions {
+  display: flex;
+  align-items: flex-end;
 }
 
 .multiselect {
@@ -175,6 +180,13 @@ body {
 
 .multiselect-option input {
   accent-color: #242424;
+}
+
+.multiselect-empty {
+  margin: 0;
+  padding: 10px 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
 }
 
 .panel-head {
@@ -271,6 +283,16 @@ body {
   color: #fff;
   background: linear-gradient(135deg, var(--accent), #3b3b3b);
   white-space: nowrap;
+}
+
+.btn-secondary {
+  border-color: var(--line);
+  color: var(--ink);
+  background: #f4f4f4;
+}
+
+.btn-secondary:hover {
+  background: #ececec;
 }
 
 .invoice-body {

@@ -5,23 +5,26 @@ const data = window.INVOICE_DATA || { invoices: [], brands: [], platforms: [] };
 const state = {
   platform: [],
   month: [],
+  year: [],
   brand: [],
 };
 
 const FILTERS = {
   platform: { rootId: "platform-filter", allLabel: "Todos los proveedores" },
   month: { rootId: "month-filter", allLabel: "Todos los meses" },
+  year: { rootId: "year-filter", allLabel: "Todos los años" },
   brand: { rootId: "brand-filter", allLabel: "Todas las marcas" },
 };
 
 const filterUis = {};
-const filterOptions = { platform: [], month: [], brand: [] };
+const filterOptions = { platform: [], month: [], year: [], brand: [] };
 const kpiTotal = document.getElementById("kpi-total");
 const kpiMeta = document.getElementById("kpi-meta");
 const kpiGoogle = document.getElementById("kpi-google");
 const kpiZeppelin = document.getElementById("kpi-zeppelin");
 const invoiceList = document.getElementById("invoices-list");
 const resultsCount = document.getElementById("results-count");
+const clearFiltersBtn = document.getElementById("clear-filters");
 
 const clpFormatter = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -32,6 +35,10 @@ const clpFormatter = new Intl.NumberFormat("es-CL", {
 const monthFormatter = new Intl.DateTimeFormat("es-CL", {
   month: "long",
   year: "numeric",
+});
+
+const monthNameFormatter = new Intl.DateTimeFormat("es-CL", {
+  month: "long",
 });
 
 const dateFormatter = new Intl.DateTimeFormat("es-CL", {
@@ -53,14 +60,75 @@ function formatCLP(value) {
   return clpFormatter.format(value || 0);
 }
 
+function normalizeText(value) {
+  return String(value ?? "").trim();
+}
+
+function toUniqueSorted(values, sorter = null) {
+  const cleaned = values.map(normalizeText).filter(Boolean);
+  const unique = Array.from(new Set(cleaned));
+  return sorter ? unique.sort(sorter) : unique.sort((a, b) => a.localeCompare(b, "es"));
+}
+
+function getMonthKey(value) {
+  const raw = normalizeText(value);
+  const monthMatch = raw.match(/^(\d{4})-(\d{2})$/);
+  if (monthMatch) {
+    const [, year, month] = monthMatch;
+    if (Number(month) >= 1 && Number(month) <= 12) return `${year}-${month}`;
+  }
+
+  const dateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateMatch) {
+    const [, year, month] = dateMatch;
+    if (Number(month) >= 1 && Number(month) <= 12) return `${year}-${month}`;
+  }
+
+  return "";
+}
+
+function getInvoiceMonthKey(invoice) {
+  return (
+    getMonthKey(invoice?.month) ||
+    getMonthKey(invoice?.periodStart) ||
+    getMonthKey(invoice?.invoiceDate) ||
+    ""
+  );
+}
+
+function getInvoiceYear(invoice) {
+  const monthKey = getInvoiceMonthKey(invoice);
+  return monthKey ? monthKey.slice(0, 4) : "";
+}
+
+function getInvoiceMonthNumber(invoice) {
+  const monthKey = getInvoiceMonthKey(invoice);
+  return monthKey ? monthKey.slice(5, 7) : "";
+}
+
+function monthNumberLabel(monthNumber) {
+  const month = Number(monthNumber);
+  if (!Number.isInteger(month) || month < 1 || month > 12) return monthNumber;
+  const date = new Date(Date.UTC(2000, month - 1, 1));
+  return monthNameFormatter.format(date);
+}
+
 function toMonthLabel(monthKey) {
-  const isoDate = `${monthKey}-01`;
-  return monthFormatter.format(new Date(`${isoDate}T00:00:00`));
+  const normalized = getMonthKey(monthKey);
+  if (!normalized) return normalizeText(monthKey) || "-";
+
+  const [year, month] = normalized.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  return monthFormatter.format(date);
 }
 
 function formatDate(isoDate) {
   if (!isoDate) return "-";
-  return dateFormatter.format(new Date(`${isoDate}T00:00:00`));
+  const normalized = normalizeText(isoDate);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  const date = new Date(`${normalized}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return normalized;
+  return dateFormatter.format(date);
 }
 
 function platformClass(platform) {
@@ -109,6 +177,7 @@ function updateFilterButtonLabel(filterKey) {
 
 function syncStateFromFilter(filterKey) {
   const ui = filterUis[filterKey];
+  if (!ui) return;
   state[filterKey] = Array.from(ui.menu.querySelectorAll('input[type="checkbox"]:checked')).map(
     (input) => input.value
   );
@@ -117,6 +186,7 @@ function syncStateFromFilter(filterKey) {
 function buildFilterDropdown(filterKey) {
   const def = FILTERS[filterKey];
   const root = document.getElementById(def.rootId);
+  if (!root) return;
 
   root.innerHTML = "";
   const button = document.createElement("button");
@@ -159,6 +229,13 @@ function buildFilterDropdown(filterKey) {
     menu.append(option);
   });
 
+  if (!filterOptions[filterKey].length) {
+    const empty = document.createElement("p");
+    empty.className = "multiselect-empty";
+    empty.textContent = "Sin opciones";
+    menu.append(empty);
+  }
+
   button.addEventListener("click", () => {
     const isOpen = root.classList.contains("open");
     closeAllFilters(filterKey);
@@ -177,24 +254,59 @@ function buildFilterDropdown(filterKey) {
 }
 
 function buildFilters() {
-  filterOptions.platform = data.platforms.map((platform) => ({ value: platform, label: platform }));
-  filterOptions.month = Array.from(new Set(data.invoices.map((item) => item.month)))
-    .sort()
-    .map((month) => ({ value: month, label: toMonthLabel(month) }));
-  filterOptions.brand = data.brands.map((brand) => ({ value: brand, label: brand }));
+  const invoices = Array.isArray(data.invoices) ? data.invoices : [];
+  const providerValues = toUniqueSorted([
+    ...invoices.map((item) => item.platform),
+    ...(Array.isArray(data.platforms) ? data.platforms : []),
+  ]);
+  const monthValues = toUniqueSorted(invoices.map((item) => getInvoiceMonthNumber(item)), (a, b) => Number(a) - Number(b));
+  const yearValues = toUniqueSorted(invoices.map((item) => getInvoiceYear(item)), (a, b) => Number(b) - Number(a));
+  const brandValues = toUniqueSorted([
+    ...invoices.map((item) => item.brand),
+    ...(Array.isArray(data.brands) ? data.brands : []),
+  ]);
+
+  filterOptions.platform = providerValues.map((platform) => ({ value: platform, label: platform }));
+  filterOptions.month = monthValues.map((month) => ({ value: month, label: monthNumberLabel(month) }));
+  filterOptions.year = yearValues.map((year) => ({ value: year, label: year }));
+  filterOptions.brand = brandValues.map((brand) => ({ value: brand, label: brand }));
 
   buildFilterDropdown("platform");
   buildFilterDropdown("month");
+  buildFilterDropdown("year");
   buildFilterDropdown("brand");
 }
 
 function getFilteredInvoices() {
-  return data.invoices.filter((invoice) => {
-    const platformMatch = !state.platform.length || state.platform.includes(invoice.platform);
-    const monthMatch = !state.month.length || state.month.includes(invoice.month);
-    const brandMatch = !state.brand.length || state.brand.includes(invoice.brand);
-    return platformMatch && monthMatch && brandMatch;
+  const invoices = Array.isArray(data.invoices) ? data.invoices : [];
+  return invoices.filter((invoice) => {
+    const platform = normalizeText(invoice.platform);
+    const brand = normalizeText(invoice.brand);
+    const year = getInvoiceYear(invoice);
+    const month = getInvoiceMonthNumber(invoice);
+
+    const platformMatch = !state.platform.length || state.platform.includes(platform);
+    const monthMatch = !state.month.length || state.month.includes(month);
+    const yearMatch = !state.year.length || state.year.includes(year);
+    const brandMatch = !state.brand.length || state.brand.includes(brand);
+    return platformMatch && monthMatch && yearMatch && brandMatch;
   });
+}
+
+function clearAllFilters() {
+  Object.keys(FILTERS).forEach((filterKey) => {
+    state[filterKey] = [];
+    const ui = filterUis[filterKey];
+    if (!ui) return;
+
+    Array.from(ui.menu.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
+      input.checked = false;
+    });
+    updateFilterButtonLabel(filterKey);
+  });
+
+  closeAllFilters();
+  render();
 }
 
 function renderKpis(filteredInvoices) {
@@ -357,7 +469,7 @@ function renderInvoices(filteredInvoices) {
               <div class="chip-row">
                 <span class="chip ${platformClass(invoice.platform)}">${esc(invoice.platform)}</span>
                 <span class="chip">${esc(invoice.brand)}</span>
-                <span class="chip">${toMonthLabel(invoice.month)}</span>
+                <span class="chip">${toMonthLabel(getInvoiceMonthKey(invoice))}</span>
               </div>
               <h4>${esc(invoice.id)}</h4>
               <div class="invoice-meta">
@@ -397,6 +509,12 @@ function attachEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeAllFilters();
   });
+
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener("click", () => {
+      clearAllFilters();
+    });
+  }
 }
 
 buildFilters();

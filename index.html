@@ -19,7 +19,7 @@
         <p class="eyebrow"><strong>Facturación EESS</strong> Paid Media</p>
         <h1>Facturas Paid Media</h1>
         <p class="subtitle">
-          Visualiza inversión total, filtra por proveedor/mes/marca y descarga cada respaldo.
+          Visualiza inversión total, filtra por proveedor/mes/año/marca y descarga cada respaldo.
         </p>
       </header>
 
@@ -52,8 +52,15 @@
           <div id="month-filter" class="multiselect"></div>
         </div>
         <div class="filter-field">
+          <label>Año</label>
+          <div id="year-filter" class="multiselect"></div>
+        </div>
+        <div class="filter-field">
           <label>Marca</label>
           <div id="brand-filter" class="multiselect"></div>
+        </div>
+        <div class="filter-actions">
+          <button id="clear-filters" class="btn btn-secondary" type="button">Limpiar filtros</button>
         </div>
       </section>
 

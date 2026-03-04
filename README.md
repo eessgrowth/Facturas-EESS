@@ -4,7 +4,7 @@ App web estática para visualizar facturas de `Meta` y `Google Ads` con:
 
 - KPIs de inversión total (`Meta + Google Ads`, `Meta`, `Google Ads`)
 - KPI adicional para `Agencia Zeppelin`
-- Filtros por `plataforma`, `mes` y `marca`
+- Filtros por `plataforma`, `mes`, `año` y `marca`
 - Detalle por factura (líneas de cargo / transacciones)
 - Descarga de respaldo (`PDF` o `Excel`)
 
