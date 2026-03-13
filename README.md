@@ -11,8 +11,10 @@ App web estática para visualizar facturas de `Meta` y `Google Ads` con:
 ## Archivos clave
 
 - `index.html`: estructura de la app
+- `campaigns.html`: vista de gasto por nombre de campaña
 - `styles.css`: estilos
 - `app.js`: lógica de filtros y render
+- `campaigns.js`: lógica de filtros y visualización por campaña
 - `scripts/build_invoice_data.py`: extracción y normalización de datos desde PDFs
 - `scripts/build_invoice_data.py`: extracción y normalización de datos desde PDFs y Excel (`Facturación EESS.xlsx`)
 - `data/invoices.json` y `data/invoices.js`: dataset generado
@@ -35,4 +37,10 @@ python3 -m http.server 8000
 
 ```text
 http://localhost:8000
+```
+
+4. Vista alternativa de campañas:
+
+```text
+http://localhost:8000/campaigns.html
 ```

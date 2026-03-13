@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gasto por Campaña</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg"></div>
+    <main class="container">
+      <header class="hero">
+        <p class="eyebrow"><strong>Facturación EESS</strong> Paid Media</p>
+        <h1>Gasto por Campaña</h1>
+        <p class="subtitle">
+          Visualiza gasto consolidado por nombre de campaña usando los detalles de facturación.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-secondary" href="./index.html">Volver a facturas</a>
+        </div>
+      </header>
+
+      <section class="kpi-grid campaign-kpi-grid">
+        <article class="kpi-card">
+          <p>Gasto filtrado</p>
+          <h2 id="campaign-kpi-total">$0</h2>
+        </article>
+        <article class="kpi-card">
+          <p>Campañas únicas</p>
+          <h2 id="campaign-kpi-unique">0</h2>
+        </article>
+        <article class="kpi-card">
+          <p>Líneas de detalle</p>
+          <h2 id="campaign-kpi-lines">0</h2>
+        </article>
+      </section>
+
+      <section class="panel campaign-filters">
+        <div class="filter-field">
+          <label for="campaign-platform-filter">Proveedor</label>
+          <select id="campaign-platform-filter"></select>
+        </div>
+        <div class="filter-field">
+          <label for="campaign-brand-filter">Marca</label>
+          <select id="campaign-brand-filter"></select>
+        </div>
+        <div class="filter-field">
+          <label for="campaign-month-filter">Mes</label>
+          <select id="campaign-month-filter"></select>
+        </div>
+        <div class="filter-field">
+          <label for="campaign-search">Buscar campaña</label>
+          <input id="campaign-search" type="search" placeholder="Ej: Las Condes" />
+        </div>
+        <div class="filter-actions">
+          <button id="campaign-clear-filters" class="btn btn-secondary" type="button">
+            Limpiar filtros
+          </button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Ranking de Campañas</h3>
+          <p id="campaign-results-count">0 campañas</p>
+        </div>
+        <div id="campaign-bars" class="campaign-bars"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Tabla de Detalle</h3>
+          <p id="campaign-lines-count">0 líneas</p>
+        </div>
+        <div class="campaign-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Campaña</th>
+                <th>Proveedor</th>
+                <th>Marca</th>
+                <th>Mes</th>
+                <th class="amount">Gasto</th>
+              </tr>
+            </thead>
+            <tbody id="campaign-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="./data/invoices.js"></script>
+    <script src="./campaigns.js"></script>
+  </body>
+</html>
