@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-19T21:36:54Z",
+  "generatedAt": "2026-03-19T21:53:35Z",
   "currency": "CLP",
   "invoices": [
     {
@@ -7143,6 +7143,18 @@
       "month": "2026-02",
       "platform": "Google Ads",
       "brand": "Socovesa",
+      "campaignName": "Santiago | AO S | Por Comuna | Macul #2",
+      "amount": 529984,
+      "legalEntity": "Consorcio Inmobiliario Macul",
+      "mappingBrand": "Socovesa Santiago",
+      "matched": true
+    },
+    {
+      "invoiceId": "5508956529",
+      "invoiceDate": "2026-02-28",
+      "month": "2026-02",
+      "platform": "Google Ads",
+      "brand": "Socovesa",
       "campaignName": "Santiago | AO S | Por Categoria | Always On Santiago",
       "amount": 570556,
       "legalEntity": "INSOCO",
@@ -7157,6 +7169,18 @@
       "brand": "Socovesa",
       "campaignName": "Santiago | AO S | Por Comuna | Maipu V2",
       "amount": 337660,
+      "legalEntity": "Inmobiliaria El Descubridor",
+      "mappingBrand": "Socovesa Santiago",
+      "matched": true
+    },
+    {
+      "invoiceId": "5508956529",
+      "invoiceDate": "2026-02-28",
+      "month": "2026-02",
+      "platform": "Google Ads",
+      "brand": "Socovesa",
+      "campaignName": "Santiago | AO S | Por Comuna | Ñuñoa #2",
+      "amount": 633002,
       "legalEntity": "Inmobiliaria El Descubridor",
       "mappingBrand": "Socovesa Santiago",
       "matched": true
@@ -7256,30 +7280,6 @@
       "legalEntity": "Pilares S.A",
       "mappingBrand": "Socovesa Santiago",
       "matched": true
-    },
-    {
-      "invoiceId": "5508956529",
-      "invoiceDate": "2026-02-28",
-      "month": "2026-02",
-      "platform": "Google Ads",
-      "brand": "Socovesa",
-      "campaignName": "Santiago | AO S | Por Comuna | Macul #2",
-      "amount": 529984,
-      "legalEntity": "Sin asignar",
-      "mappingBrand": "",
-      "matched": false
-    },
-    {
-      "invoiceId": "5508956529",
-      "invoiceDate": "2026-02-28",
-      "month": "2026-02",
-      "platform": "Google Ads",
-      "brand": "Socovesa",
-      "campaignName": "Santiago | AO S | Por Comuna | Ñuñoa #2",
-      "amount": 633002,
-      "legalEntity": "Sin asignar",
-      "mappingBrand": "",
-      "matched": false
     },
     {
       "invoiceId": "5508956529",

@@ -89,6 +89,12 @@ def normalize_brand_group(value: str) -> str:
     return plain
 
 
+def brand_group_aliases(brand_group: str) -> list[str]:
+    if brand_group == "socovesa":
+        return ["socovesa", "socovesasantiago", "socovesasur"]
+    return [brand_group]
+
+
 def is_special_charge_label(label: str) -> bool:
     normalized = normalize_key(label)
     return (
@@ -1225,7 +1231,45 @@ def build_reason_social_rows(
                 continue
 
             campaign_key = normalize_key(campaign_name)
-            candidates = by_brand_campaign.get((brand_group, campaign_key), [])
+            candidate_pool: list[dict[str, Any]] = []
+            for alias in brand_group_aliases(brand_group):
+                candidate_pool.extend(by_brand_campaign.get((alias, campaign_key), []))
+
+            # Deduplicate keeping deterministic order.
+            seen_candidate_keys: set[tuple[str, str, str]] = set()
+            candidates: list[dict[str, Any]] = []
+            for candidate in candidate_pool:
+                candidate_key = (
+                    str(candidate.get("brandGroup", "")),
+                    str(candidate.get("campaignKey", "")),
+                    str(candidate.get("legalEntity", "")),
+                )
+                if candidate_key in seen_candidate_keys:
+                    continue
+                seen_candidate_keys.add(candidate_key)
+                candidates.append(candidate)
+
+            if brand_group == "socovesa" and len({item["legalEntity"] for item in candidates}) > 1:
+                looks_like_sur = any(
+                    token in campaign_key
+                    for token in (
+                        "sur",
+                        "centrosur",
+                        "suraustral",
+                        "austral",
+                        "temuco",
+                        "valdivia",
+                        "puertomontt",
+                        "puntaarenas",
+                        "chillan",
+                        "losangeles",
+                    )
+                )
+                preferred_group = "socovesasur" if looks_like_sur else "socovesasantiago"
+                preferred = [item for item in candidates if item.get("brandGroup") == preferred_group]
+                if preferred:
+                    candidates = preferred
+
             if not candidates:
                 fallback = by_campaign.get(campaign_key, [])
                 if len({item["legalEntity"] for item in fallback}) == 1:
@@ -1234,8 +1278,9 @@ def build_reason_social_rows(
             legal_entity = "Sin asignar"
             mapping_brand = ""
             if candidates:
-                legal_entity = candidates[0]["legalEntity"]
-                mapping_brand = candidates[0]["brand"]
+                sorted_candidates = sorted(candidates, key=lambda item: (item.get("legalEntity", ""), item.get("brand", "")))
+                legal_entity = sorted_candidates[0]["legalEntity"]
+                mapping_brand = sorted_candidates[0]["brand"]
 
             rows.append(
                 {
