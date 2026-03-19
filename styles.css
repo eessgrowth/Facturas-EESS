@@ -215,10 +215,29 @@ body {
   color: var(--muted);
 }
 
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.panel-head-actions .btn {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
 .rs-summary {
   margin: 0 0 10px;
   color: var(--muted);
   font-size: 0.84rem;
+}
+
+#rs-breakdown-body .total-row td {
+  font-weight: 700;
+  border-top: 2px solid #7a7a7a;
+  background: #f3f3f3;
 }
 
 .invoice-list {

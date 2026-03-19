@@ -28,7 +28,11 @@ const clearFiltersBtn = document.getElementById("clear-filters");
 const rsResultsCount = document.getElementById("rs-results-count");
 const rsSummary = document.getElementById("rs-summary");
 const rsBreakdownBody = document.getElementById("rs-breakdown-body");
+const rsExportXlsxBtn = document.getElementById("rs-export-xlsx");
+const rsExportPdfBtn = document.getElementById("rs-export-pdf");
 const allReasonSocialRows = Array.isArray(data.reasonSocialRows) ? data.reasonSocialRows : [];
+let currentReasonSocialSummaryRows = [];
+let currentReasonSocialMeta = { totalAmount: 0, totalUniqueCampaigns: 0, totalLines: 0 };
 
 const clpFormatter = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -155,6 +159,113 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function getExportFileBaseName() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `resumen_razon_social_${yyyy}-${mm}-${dd}`;
+}
+
+function exportReasonSocialTableXlsx() {
+  if (!currentReasonSocialSummaryRows.length) return;
+  if (!window.XLSX) {
+    window.alert("No fue posible cargar la librería de exportación XLSX.");
+    return;
+  }
+
+  const totalPercent = currentReasonSocialMeta.totalAmount > 0 ? 1 : 0;
+  const headers = ["Razón social", "Monto total", "% del total", "Campañas", "Líneas"];
+  const body = currentReasonSocialSummaryRows.map((row) => [
+    row.legalEntity,
+    row.totalAmount,
+    currentReasonSocialMeta.totalAmount ? row.totalAmount / currentReasonSocialMeta.totalAmount : 0,
+    row.campaignCount,
+    row.lines,
+  ]);
+
+  body.push([
+    "TOTAL",
+    currentReasonSocialMeta.totalAmount,
+    totalPercent,
+    currentReasonSocialMeta.totalUniqueCampaigns,
+    currentReasonSocialMeta.totalLines,
+  ]);
+
+  const worksheet = window.XLSX.utils.aoa_to_sheet([headers, ...body]);
+  worksheet["!cols"] = [{ wch: 42 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 10 }];
+
+  for (let rowIndex = 2; rowIndex <= body.length + 1; rowIndex += 1) {
+    const amountCell = worksheet[`B${rowIndex}`];
+    const pctCell = worksheet[`C${rowIndex}`];
+    if (amountCell) amountCell.z = '"$"#,##0';
+    if (pctCell) pctCell.z = "0.00%";
+  }
+
+  const workbook = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(workbook, worksheet, "Resumen RS");
+  window.XLSX.writeFile(workbook, `${getExportFileBaseName()}.xlsx`);
+}
+
+function exportReasonSocialTablePdf() {
+  if (!currentReasonSocialSummaryRows.length) return;
+  const jsPdfApi = window.jspdf?.jsPDF;
+  if (!jsPdfApi) {
+    window.alert("No fue posible cargar la librería de exportación PDF.");
+    return;
+  }
+
+  const doc = new jsPdfApi({ orientation: "landscape", unit: "pt", format: "a4" });
+  if (typeof doc.autoTable !== "function") {
+    window.alert("No fue posible cargar la librería de tablas para PDF.");
+    return;
+  }
+
+  const totalAmount = currentReasonSocialMeta.totalAmount;
+  const body = currentReasonSocialSummaryRows.map((row) => [
+    row.legalEntity,
+    formatCLP(row.totalAmount),
+    totalAmount ? `${((row.totalAmount / totalAmount) * 100).toFixed(2)}%` : "0.00%",
+    String(row.campaignCount),
+    String(row.lines),
+  ]);
+
+  body.push([
+    "TOTAL",
+    formatCLP(totalAmount),
+    totalAmount ? "100.00%" : "0.00%",
+    String(currentReasonSocialMeta.totalUniqueCampaigns),
+    String(currentReasonSocialMeta.totalLines),
+  ]);
+
+  doc.setFontSize(13);
+  doc.text("Resumen por Razón Social", 40, 36);
+  doc.setFontSize(10);
+  doc.text(`Generado: ${new Date().toLocaleDateString("es-CL")}`, 40, 54);
+
+  doc.autoTable({
+    startY: 68,
+    head: [["Razón social", "Monto total", "% del total", "Campañas", "Líneas"]],
+    body,
+    styles: { fontSize: 9, cellPadding: 6 },
+    headStyles: { fillColor: [31, 31, 31] },
+    columnStyles: {
+      1: { halign: "right" },
+      2: { halign: "right" },
+      3: { halign: "right" },
+      4: { halign: "right" },
+    },
+    didParseCell(hookData) {
+      if (hookData.section === "body" && hookData.row.index === body.length - 1) {
+        hookData.cell.styles.fontStyle = "bold";
+        hookData.cell.styles.fillColor = [243, 243, 243];
+      }
+    },
+  });
+
+  doc.save(`${getExportFileBaseName()}.pdf`);
+}
+
 function renderRsBreakdown(filteredInvoices) {
   if (!rsBreakdownBody || !rsResultsCount || !rsSummary) return;
 
@@ -197,10 +308,21 @@ function renderRsBreakdown(filteredInvoices) {
   rsResultsCount.textContent = `${rows.length} razón${rows.length === 1 ? "" : "es"} social${rows.length === 1 ? "" : "es"}`;
 
   const totalCampaignSpend = rows.reduce((sum, row) => sum + row.totalAmount, 0);
+  const totalUniqueCampaigns = new Set(campaignRows.map((row) => normalizeText(row.campaignName)).filter(Boolean)).size;
+  const totalLines = campaignRows.length;
   const unassignedAmount = rows
     .filter((row) => row.legalEntity === "Sin asignar")
     .reduce((sum, row) => sum + row.totalAmount, 0);
   rsSummary.textContent = `Gasto campañas (Meta + Google): ${formatCLP(totalCampaignSpend)} | Sin asignar: ${formatCLP(unassignedAmount)} | Líneas de campaña: ${campaignRows.length}`;
+  currentReasonSocialSummaryRows = rows;
+  currentReasonSocialMeta = {
+    totalAmount: totalCampaignSpend,
+    totalUniqueCampaigns,
+    totalLines,
+  };
+
+  if (rsExportXlsxBtn) rsExportXlsxBtn.disabled = rows.length === 0;
+  if (rsExportPdfBtn) rsExportPdfBtn.disabled = rows.length === 0;
 
   if (!rows.length) {
     rsBreakdownBody.innerHTML = '<tr><td colspan="5" class="empty">No hay campañas para los filtros seleccionados.</td></tr>';
@@ -219,6 +341,15 @@ function renderRsBreakdown(filteredInvoices) {
       </tr>`
     )
     .join("");
+
+  rsBreakdownBody.innerHTML += `
+      <tr class="total-row">
+        <td>TOTAL</td>
+        <td class="amount">${formatCLP(totalCampaignSpend)}</td>
+        <td class="amount">${totalCampaignSpend ? "100.00%" : "0.00%"}</td>
+        <td class="amount">${totalUniqueCampaigns}</td>
+        <td class="amount">${totalLines}</td>
+      </tr>`;
 }
 
 function closeAllFilters(exceptKey = null) {
@@ -589,6 +720,18 @@ function attachEvents() {
   if (clearFiltersBtn) {
     clearFiltersBtn.addEventListener("click", () => {
       clearAllFilters();
+    });
+  }
+
+  if (rsExportXlsxBtn) {
+    rsExportXlsxBtn.addEventListener("click", () => {
+      exportReasonSocialTableXlsx();
+    });
+  }
+
+  if (rsExportPdfBtn) {
+    rsExportPdfBtn.addEventListener("click", () => {
+      exportReasonSocialTablePdf();
     });
   }
 }

@@ -78,7 +78,11 @@
       <section class="panel">
         <div class="panel-head">
           <h3>Resumen por Razón Social</h3>
-          <p id="rs-results-count">0 razones sociales</p>
+          <div class="panel-head-actions">
+            <p id="rs-results-count">0 razones sociales</p>
+            <button id="rs-export-xlsx" class="btn btn-secondary" type="button">Descargar XLSX</button>
+            <button id="rs-export-pdf" class="btn btn-secondary" type="button">Descargar PDF</button>
+          </div>
         </div>
         <p id="rs-summary" class="rs-summary"></p>
         <div class="campaign-table-wrap">
@@ -99,6 +103,9 @@
     </main>
 
     <script src="./data/invoices.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
