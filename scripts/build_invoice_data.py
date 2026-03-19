@@ -21,6 +21,7 @@ from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parent.parent
 PDF_DIR = ROOT / "pdfs"
+META_INVOICES_DIR = ROOT / "Facturas Meta"
 DATA_DIR = ROOT / "data"
 JSON_OUT = DATA_DIR / "invoices.json"
 JS_OUT = DATA_DIR / "invoices.js"
@@ -58,6 +59,7 @@ SPANISH_MONTHS = {
 
 DATE_DMY_RE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 DATE_DMONY_RE = re.compile(r"^(\d{1,2})\s+([a-zA-Z]{3})\s+(\d{4})$")
+META_RECEIPT_DATE_RE = re.compile(r"(\d{1,2})\s+([a-zA-Záéíóúñ\.]+)\s+(\d{4})", re.IGNORECASE)
 
 
 @dataclass
@@ -125,6 +127,21 @@ def month_key_from_spanish_name(value: str) -> str:
     return f"{year:04d}-{month:02d}"
 
 
+def month_key_from_folder_name(value: str) -> str:
+    normalized = value.strip().lower().replace("_", " ")
+    parts = normalized.split()
+    if len(parts) < 2:
+        return ""
+    month_num = SPANISH_MONTHS.get(parts[0].replace(".", ""))
+    if not month_num:
+        return ""
+    try:
+        year = int(parts[1])
+    except ValueError:
+        return ""
+    return f"{year:04d}-{month_num:02d}"
+
+
 def excel_number_to_str(raw: str) -> str:
     # Excel stores long ids as scientific notation in XML.
     as_int = int(round(float(raw)))
@@ -164,6 +181,11 @@ def first_day_next_month(month: str) -> str:
     if month_num == 12:
         return f"{year + 1:04d}-01-01"
     return f"{year:04d}-{month_num + 1:02d}-01"
+
+
+def last_day_of_month(month: str) -> str:
+    year, month_num = map(int, month.split("-"))
+    return f"{year:04d}-{month_num:02d}-{monthrange(year, month_num)[1]:02d}"
 
 
 def parse_meta_invoice_ocr_fallback(path: Path, warnings: list[ParseWarning]) -> dict[str, Any] | None:
@@ -338,6 +360,180 @@ def parse_meta_invoice_activity_export(text: str, filename: str, warnings: list[
         "totalFunds": total_funds,
         "details": details,
     }
+
+
+def normalize_meta_folder_brand(folder_name: str) -> tuple[str, str]:
+    key = folder_name.strip().lower()
+    if key == "almagro":
+        return "Almagro Inmobiliaria", "ALMAGRO S A"
+    if key == "socovesa":
+        return "Socovesa", "Socovesa"
+    if key == "pilares":
+        return "Pilares", "Pilares"
+    cleaned = folder_name.strip()
+    return cleaned, cleaned
+
+
+def iso_from_meta_receipt_date(value: str) -> str:
+    m = META_RECEIPT_DATE_RE.search(value.strip().lower())
+    if not m:
+        raise ValueError(f"Invalid Meta receipt date: {value}")
+    day, mon_txt, year = m.groups()
+    mon_key = mon_txt.replace(".", "")
+    month = SPANISH_MONTHS.get(mon_key) or SPANISH_MONTHS.get(mon_key[:3])
+    if not month:
+        raise ValueError(f"Unsupported month token in Meta receipt date: {value}")
+    return datetime(int(year), month, int(day)).strftime("%Y-%m-%d")
+
+
+def parse_meta_receipt_pdf(path: Path, warnings: list[ParseWarning], month_hint: str) -> dict[str, Any] | None:
+    text = extract_text_pypdf(path)
+    flat = " | ".join([ln.strip() for ln in text.splitlines() if ln.strip()])
+
+    tx_m = re.search(r"Identificador de la transacción\s*[:|]?\s*([0-9]{10,}-[0-9]{10,})", flat, re.IGNORECASE)
+    amount_m = re.search(r"(Pagado|Fondos agregados)\s*[:|]?\s*\$([\d\.,]+)", flat, re.IGNORECASE)
+    account_m = re.search(r"Identificador de la cuenta\s*[:|]?\s*([0-9]+)", flat, re.IGNORECASE)
+    method_m = re.search(r"Método de pago\s*[:|]?\s*([^|]+)", flat, re.IGNORECASE)
+    date_m = re.search(
+        r"Fecha de nota de pago pendiente/comprobante de pago\s*[:|]?\s*([0-9]{1,2}\s+[a-zA-Záéíóúñ\.]+\s+[0-9]{4})",
+        flat,
+        re.IGNORECASE,
+    )
+
+    tx_id = tx_m.group(1).strip() if tx_m else ""
+    if not tx_id:
+        warnings.append(ParseWarning(source=path.name, message="Could not parse transaction id in Meta receipt PDF."))
+        return None
+
+    if not amount_m:
+        warnings.append(ParseWarning(source=path.name, message="Could not parse amount/status in Meta receipt PDF."))
+        return None
+    status = amount_m.group(1).strip()
+    amount = clp_to_int(amount_m.group(2))
+    if amount == 0:
+        warnings.append(ParseWarning(source=path.name, message="Parsed zero amount in Meta receipt PDF."))
+        return None
+
+    date_iso = ""
+    if date_m:
+        try:
+            date_iso = iso_from_meta_receipt_date(date_m.group(1))
+        except ValueError as exc:
+            warnings.append(ParseWarning(source=path.name, message=str(exc)))
+
+    if not date_iso:
+        filename_date_m = re.match(r"(\d{4}-\d{2}-\d{2})T", path.name)
+        date_iso = filename_date_m.group(1) if filename_date_m else ""
+    if not date_iso and month_hint:
+        date_iso = f"{month_hint}-01"
+    if not date_iso:
+        warnings.append(ParseWarning(source=path.name, message="Could not infer date in Meta receipt PDF."))
+        return None
+
+    resolved_month = month_hint or month_key(date_iso)
+    return {
+        "month": resolved_month,
+        "date": date_iso,
+        "transactionId": tx_id,
+        "paymentMethod": method_m.group(1).strip() if method_m else "No disponible",
+        "status": status,
+        "amount": amount,
+        "accountId": account_m.group(1).strip() if account_m else "",
+        "sourceFile": str(path.relative_to(ROOT)),
+    }
+
+
+def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> list[dict[str, Any]]:
+    if not root_dir.exists():
+        return []
+
+    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+    for brand_dir in sorted(root_dir.iterdir()):
+        if not brand_dir.is_dir():
+            continue
+        brand, account_name = normalize_meta_folder_brand(brand_dir.name)
+
+        for month_dir in sorted(brand_dir.iterdir()):
+            if not month_dir.is_dir():
+                continue
+            month_hint = month_key_from_folder_name(month_dir.name)
+
+            for pdf_file in sorted(month_dir.glob("*.pdf")):
+                parsed = parse_meta_receipt_pdf(pdf_file, warnings, month_hint)
+                if not parsed:
+                    continue
+
+                month = parsed["month"]
+                key = (brand, account_name, month)
+                if key not in grouped:
+                    grouped[key] = {
+                        "details": [],
+                        "seenTx": set(),
+                        "accountIds": [],
+                        "sourceDir": str(month_dir.relative_to(ROOT)),
+                    }
+                current = grouped[key]
+                tx_id = parsed["transactionId"]
+                if tx_id in current["seenTx"]:
+                    continue
+
+                current["seenTx"].add(tx_id)
+                if parsed["accountId"]:
+                    current["accountIds"].append(parsed["accountId"])
+                current["details"].append(
+                    {
+                        "date": parsed["date"],
+                        "transactionId": tx_id,
+                        "paymentMethod": parsed["paymentMethod"],
+                        "status": parsed["status"],
+                        "amount": parsed["amount"],
+                        "sourceFile": parsed["sourceFile"],
+                    }
+                )
+
+    invoices: list[dict[str, Any]] = []
+    for (brand, account_name, month), values in sorted(grouped.items()):
+        details = sorted(values["details"], key=lambda row: row["date"], reverse=True)
+        if not details:
+            continue
+
+        total_billed = sum(item["amount"] for item in details if item["status"] == "Pagado")
+        total_funds = sum(item["amount"] for item in details if item["status"] == "Fondos agregados")
+        account_id = values["accountIds"][0] if values["accountIds"] else ""
+        period_start = f"{month}-01"
+        period_end = last_day_of_month(month)
+
+        notes = [f"Montos agregados desde comprobantes en carpeta: {values['sourceDir']}."]
+        if brand == "Almagro Inmobiliaria":
+            notes.append("Meta agrupa esta cuenta como ALMAGRO S A y no separa Inmobiliaria/Propiedades.")
+
+        invoices.append(
+            {
+                "id": f"meta-{brand.lower().replace(' ', '-')}-{month}",
+                "sourceFile": values["sourceDir"],
+                "pdfFile": "",
+                "documentFile": "",
+                "platform": "Meta",
+                "brand": brand,
+                "month": month,
+                "invoiceDate": details[0]["date"],
+                "periodStart": period_start,
+                "periodEnd": period_end,
+                "dueDate": "",
+                "currency": "CLP",
+                "accountName": account_name,
+                "accountId": account_id,
+                "totalAmount": total_billed,
+                "summaryBreakdown": [
+                    {"label": "Importe total facturado", "amount": total_billed},
+                    {"label": "Total de fondos agregado", "amount": total_funds},
+                ],
+                "details": details,
+                "notes": notes,
+            }
+        )
+    return invoices
 
 
 def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, Any]:
@@ -924,6 +1120,12 @@ def parse_zeppelin_excel(path: Path, warnings: list[ParseWarning], document_file
 def main() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     warnings: list[ParseWarning] = []
+    existing_data: dict[str, Any] = {}
+    if JSON_OUT.exists():
+        try:
+            existing_data = json.loads(JSON_OUT.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            warnings.append(ParseWarning(source=JSON_OUT.name, message=f"Could not parse existing JSON: {exc}"))
 
     invoices: list[dict[str, Any]] = []
     rs_rules: list[dict[str, Any]] = []
@@ -932,15 +1134,27 @@ def main() -> None:
 
     for file in google_files:
         invoices.append(parse_google_invoice(file, warnings))
-    for file in meta_files:
-        invoices.append(parse_meta_invoice(file, warnings))
+
+    meta_receipt_invoices = parse_meta_receipt_folders(META_INVOICES_DIR, warnings)
+    if meta_receipt_invoices:
+        invoices.extend(meta_receipt_invoices)
+    else:
+        for file in meta_files:
+            invoices.append(parse_meta_invoice(file, warnings))
+
     excel_files = sorted(ROOT.glob(EXCEL_PATTERN))
-    for file in excel_files:
-        target_excel = PDF_DIR / "Facturacion_EESS.xlsx"
-        if file.resolve() != target_excel.resolve():
-            shutil.copy2(file, target_excel)
-        invoices.extend(parse_zeppelin_excel(file, warnings, document_file=f"pdfs/{target_excel.name}"))
-        rs_rules.extend(parse_rs_excel(file, warnings))
+    if excel_files:
+        for file in excel_files:
+            target_excel = PDF_DIR / "Facturacion_EESS.xlsx"
+            if file.resolve() != target_excel.resolve():
+                shutil.copy2(file, target_excel)
+            invoices.extend(parse_zeppelin_excel(file, warnings, document_file=f"pdfs/{target_excel.name}"))
+            rs_rules.extend(parse_rs_excel(file, warnings))
+    else:
+        existing_invoices = existing_data.get("invoices", []) if isinstance(existing_data, dict) else []
+        carried_zeppelin = [item for item in existing_invoices if item.get("platform") == "Agencia Zeppelin"]
+        invoices.extend(carried_zeppelin)
+        rs_rules = existing_data.get("rsRules", []) if isinstance(existing_data.get("rsRules"), list) else []
 
     invoices.sort(key=lambda item: (item["month"], item["platform"], item["brand"], item["invoiceDate"]))
 

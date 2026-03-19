@@ -21,7 +21,7 @@ App web estática para visualizar facturas de `Meta` y `Google Ads` con:
 
 ## Uso
 
-1. Regenerar datos (si cambias o agregas PDFs en `pdfs/`):
+1. Regenerar datos (si cambias o agregas PDFs en `pdfs/` o comprobantes de Meta en `Facturas Meta/<marca>/<mes>/`):
 
 ```bash
 python3 scripts/build_invoice_data.py
