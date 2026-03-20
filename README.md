@@ -13,9 +13,11 @@ App web estática para visualizar facturas de `Meta` y `Google Ads` con:
 
 - `index.html`: estructura de la app
 - `campaigns.html`: vista de gasto por nombre de campaña
+- `reason-social-detail.html`: detalle de razón social aperturado por proyecto/campaña/ID (con exportación XLSX/PDF)
 - `styles.css`: estilos
 - `app.js`: lógica de filtros y render
 - `campaigns.js`: lógica de filtros y visualización por campaña
+- `reason-social-detail.js`: lógica de la tabla detallada por razón social
 - `scripts/build_invoice_data.py`: extracción y normalización de datos desde PDFs
 - `scripts/build_invoice_data.py`: extracción y normalización de datos desde PDFs y Excel (`Facturación EESS.xlsx`)
 - `data/invoices.json` y `data/invoices.js`: dataset generado
@@ -44,4 +46,10 @@ http://localhost:8000
 
 ```text
 http://localhost:8000/campaigns.html
+```
+
+5. Vista detallada por razón social:
+
+```text
+http://localhost:8000/reason-social-detail.html
 ```

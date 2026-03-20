@@ -566,6 +566,7 @@ def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> 
                         "accountIds": [],
                         "sourceDir": str(month_dir.relative_to(ROOT)),
                         "campaignTotals": defaultdict(int),
+                        "campaignDetails": [],
                     }
                 current = grouped[key]
                 tx_id = parsed["transactionId"]
@@ -590,6 +591,14 @@ def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> 
                     campaign_amount = int(campaign.get("amount", 0) or 0)
                     if campaign_name and campaign_amount > 0:
                         current["campaignTotals"][campaign_name] += campaign_amount
+                        current["campaignDetails"].append(
+                            {
+                                "name": campaign_name,
+                                "amount": campaign_amount,
+                                "transactionId": tx_id,
+                                "date": parsed["date"],
+                            }
+                        )
 
     invoices: list[dict[str, Any]] = []
     for (brand, account_name, month), values in sorted(grouped.items()):
@@ -609,6 +618,10 @@ def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> 
                 if amount > 0
             ),
             key=lambda item: (-item["amount"], item["name"]),
+        )
+        campaign_details = sorted(
+            values.get("campaignDetails", []),
+            key=lambda item: (item.get("date", ""), item.get("transactionId", ""), item.get("name", "")),
         )
 
         notes = [f"Montos agregados desde comprobantes en carpeta: {values['sourceDir']}."]
@@ -638,6 +651,7 @@ def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> 
                 ],
                 "details": details,
                 "campaigns": campaigns,
+                "campaignDetails": campaign_details,
                 "notes": notes,
             }
         )
@@ -1172,6 +1186,7 @@ def parse_reason_social_sheet(path: Path, warnings: list[ParseWarning]) -> list[
         brand = row.get("C", "").strip()
         campaign = row.get("D", "").strip()
         legal_entity = row.get("E", "").strip()
+        project = row.get("F", "").strip()
 
         if not brand or not campaign or not legal_entity:
             continue
@@ -1185,15 +1200,19 @@ def parse_reason_social_sheet(path: Path, warnings: list[ParseWarning]) -> list[
                 "campaignName": campaign,
                 "campaignKey": normalize_key(campaign),
                 "legalEntity": legal_entity,
+                "project": project,
             }
         )
 
-    deduped: dict[tuple[str, str, str], dict[str, Any]] = {}
+    deduped: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     for item in mappings:
-        key = (item["brandGroup"], item["campaignKey"], item["legalEntity"])
+        key = (item["brandGroup"], item["campaignKey"], item["legalEntity"], item["project"])
         deduped[key] = item
 
-    return sorted(deduped.values(), key=lambda item: (item["brand"], item["campaignName"], item["legalEntity"]))
+    return sorted(
+        deduped.values(),
+        key=lambda item: (item["brand"], item["campaignName"], item["legalEntity"], item["project"]),
+    )
 
 
 def build_reason_social_rows(
@@ -1224,6 +1243,43 @@ def build_reason_social_rows(
                 charges.append({"label": label, "amount": amount})
         return charges
 
+    def campaign_reference_type(platform: str) -> str:
+        return "transactionId" if platform == "Meta" else "invoiceNumber"
+
+    def extract_campaign_lines(invoice: dict[str, Any], platform: str) -> list[dict[str, Any]]:
+        lines: list[dict[str, Any]] = []
+        invoice_id = str(invoice.get("id", "")).strip()
+
+        if platform == "Meta":
+            campaign_details = (
+                invoice.get("campaignDetails", []) if isinstance(invoice.get("campaignDetails"), list) else []
+            )
+            for detail in campaign_details:
+                campaign_name = str(detail.get("name", "") or detail.get("campaignName", "")).strip()
+                amount = int(detail.get("amount", 0) or 0)
+                transaction_id = str(detail.get("transactionId", "")).strip()
+                if not campaign_name or amount <= 0:
+                    continue
+                lines.append(
+                    {
+                        "campaignName": campaign_name,
+                        "amount": amount,
+                        "referenceId": transaction_id or invoice_id,
+                    }
+                )
+            if lines:
+                return lines
+
+        campaigns = invoice.get("campaigns", []) if isinstance(invoice.get("campaigns"), list) else []
+        for campaign in campaigns:
+            campaign_name = str(campaign.get("name", "")).strip()
+            amount = int(campaign.get("amount", 0) or 0)
+            if not campaign_name or amount <= 0:
+                continue
+            lines.append({"campaignName": campaign_name, "amount": amount, "referenceId": invoice_id})
+
+        return lines
+
     by_brand_campaign: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     by_campaign: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
@@ -1240,11 +1296,13 @@ def build_reason_social_rows(
 
         brand = str(invoice.get("brand", "")).strip()
         brand_group = normalize_brand_group(brand)
-        campaigns = invoice.get("campaigns", []) if isinstance(invoice.get("campaigns"), list) else []
+        campaign_lines = extract_campaign_lines(invoice, platform)
+        reference_type = campaign_reference_type(platform)
 
-        for campaign in campaigns:
-            campaign_name = str(campaign.get("name", "")).strip()
-            amount = int(campaign.get("amount", 0) or 0)
+        for campaign_line in campaign_lines:
+            campaign_name = str(campaign_line.get("campaignName", "")).strip()
+            amount = int(campaign_line.get("amount", 0) or 0)
+            reference_id = str(campaign_line.get("referenceId", "")).strip() or str(invoice.get("id", "")).strip()
             if not campaign_name or amount <= 0:
                 continue
 
@@ -1254,13 +1312,14 @@ def build_reason_social_rows(
                 candidate_pool.extend(by_brand_campaign.get((alias, campaign_key), []))
 
             # Deduplicate keeping deterministic order.
-            seen_candidate_keys: set[tuple[str, str, str]] = set()
+            seen_candidate_keys: set[tuple[str, str, str, str]] = set()
             candidates: list[dict[str, Any]] = []
             for candidate in candidate_pool:
                 candidate_key = (
                     str(candidate.get("brandGroup", "")),
                     str(candidate.get("campaignKey", "")),
                     str(candidate.get("legalEntity", "")),
+                    str(candidate.get("project", "")),
                 )
                 if candidate_key in seen_candidate_keys:
                     continue
@@ -1294,10 +1353,15 @@ def build_reason_social_rows(
                     candidates = fallback
 
             legal_entity = "Sin asignar"
+            project = "Sin asignar"
             mapping_brand = ""
             if candidates:
-                sorted_candidates = sorted(candidates, key=lambda item: (item.get("legalEntity", ""), item.get("brand", "")))
+                sorted_candidates = sorted(
+                    candidates,
+                    key=lambda item: (item.get("legalEntity", ""), item.get("project", ""), item.get("brand", "")),
+                )
                 legal_entity = sorted_candidates[0]["legalEntity"]
+                project = str(sorted_candidates[0].get("project", "")).strip() or "Sin asignar"
                 mapping_brand = sorted_candidates[0]["brand"]
 
             rows.append(
@@ -1310,25 +1374,37 @@ def build_reason_social_rows(
                     "campaignName": campaign_name,
                     "amount": amount,
                     "legalEntity": legal_entity,
+                    "project": project,
+                    "referenceId": reference_id,
+                    "referenceType": reference_type,
                     "mappingBrand": mapping_brand,
                     "matched": legal_entity != "Sin asignar",
                 }
             )
 
     brand_top_legal_entity: dict[str, str] = {}
+    brand_top_assignment: dict[str, tuple[str, str]] = {}
     brand_totals: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    brand_assignment_totals: dict[str, dict[tuple[str, str], int]] = defaultdict(lambda: defaultdict(int))
     for row in rows:
         legal_entity = str(row.get("legalEntity", "")).strip()
+        project = str(row.get("project", "")).strip()
         brand = str(row.get("brand", "")).strip()
         amount = int(row.get("amount", 0) or 0)
         if not brand or not legal_entity or legal_entity == "Sin asignar" or amount <= 0:
             continue
         brand_totals[brand][legal_entity] += amount
+        if project and project != "Sin asignar":
+            brand_assignment_totals[brand][(legal_entity, project)] += amount
 
     for brand, totals in brand_totals.items():
         sorted_totals = sorted(totals.items(), key=lambda item: (-item[1], item[0]))
         if sorted_totals:
             brand_top_legal_entity[brand] = sorted_totals[0][0]
+    for brand, totals in brand_assignment_totals.items():
+        sorted_totals = sorted(totals.items(), key=lambda item: (-item[1], item[0][0], item[0][1]))
+        if sorted_totals:
+            brand_top_assignment[brand] = sorted_totals[0][0]
 
     for invoice in invoices:
         platform = str(invoice.get("platform", "")).strip()
@@ -1341,6 +1417,12 @@ def build_reason_social_rows(
 
         brand = str(invoice.get("brand", "")).strip()
         top_legal_entity = brand_top_legal_entity.get(brand, "Sin asignar")
+        top_project = "Sin asignar"
+        if brand in brand_top_assignment:
+            _, mapped_project = brand_top_assignment[brand]
+            top_project = mapped_project or "Sin asignar"
+        reference_type = campaign_reference_type(platform)
+        reference_id = str(invoice.get("id", "")).strip()
         for charge in special_charges:
             rows.append(
                 {
@@ -1352,6 +1434,9 @@ def build_reason_social_rows(
                     "campaignName": charge["label"],
                     "amount": charge["amount"],
                     "legalEntity": top_legal_entity,
+                    "project": top_project,
+                    "referenceId": reference_id,
+                    "referenceType": reference_type,
                     "mappingBrand": "",
                     "matched": top_legal_entity != "Sin asignar",
                 }
@@ -1364,7 +1449,9 @@ def build_reason_social_rows(
             item["platform"],
             item["brand"],
             item["legalEntity"],
+            item["project"],
             item["campaignName"],
+            item["referenceId"],
         ),
     )
 

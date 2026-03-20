@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Detalle por Razón Social</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg"></div>
+    <main class="container">
+      <header class="hero">
+        <p class="eyebrow"><strong>Facturación EESS</strong> Paid Media</p>
+        <h1>Detalle por Razón Social</h1>
+        <p class="subtitle">
+          Apertura por razón social, plataforma, proyecto, campaña e ID de transacción (Meta) o número de factura
+          (Google Ads).
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-secondary" href="./index.html">Volver a facturas</a>
+          <a class="btn btn-secondary" href="./campaigns.html">Ver gasto por campaña</a>
+        </div>
+      </header>
+
+      <section class="kpi-grid campaign-kpi-grid">
+        <article class="kpi-card">
+          <p>Monto filtrado</p>
+          <h2 id="rsd-kpi-total">$0</h2>
+        </article>
+        <article class="kpi-card">
+          <p>Filas</p>
+          <h2 id="rsd-kpi-rows">0</h2>
+        </article>
+        <article class="kpi-card">
+          <p>Campañas únicas</p>
+          <h2 id="rsd-kpi-campaigns">0</h2>
+        </article>
+      </section>
+
+      <section class="panel campaign-filters">
+        <div class="filter-field">
+          <label for="rsd-platform-filter">Proveedor</label>
+          <select id="rsd-platform-filter"></select>
+        </div>
+        <div class="filter-field">
+          <label for="rsd-brand-filter">Marca</label>
+          <select id="rsd-brand-filter"></select>
+        </div>
+        <div class="filter-field">
+          <label for="rsd-month-filter">Mes</label>
+          <select id="rsd-month-filter"></select>
+        </div>
+        <div class="filter-field">
+          <label for="rsd-year-filter">Año</label>
+          <select id="rsd-year-filter"></select>
+        </div>
+        <div class="filter-field">
+          <label for="rsd-legal-filter">Razón social</label>
+          <select id="rsd-legal-filter"></select>
+        </div>
+        <div class="filter-field">
+          <label for="rsd-search">Buscar campaña/ID</label>
+          <input id="rsd-search" type="search" placeholder="Ej: Las Condes o 257301571..." />
+        </div>
+        <div class="filter-actions">
+          <button id="rsd-clear-filters" class="btn btn-secondary" type="button">Limpiar filtros</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Detalle Aperturado</h3>
+          <div class="panel-head-actions">
+            <p id="rsd-results-count">0 filas</p>
+            <button id="rsd-export-xlsx" class="btn btn-secondary" type="button">Descargar XLSX</button>
+            <button id="rsd-export-pdf" class="btn btn-secondary" type="button">Descargar PDF</button>
+          </div>
+        </div>
+        <div class="campaign-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Razón social</th>
+                <th>Plataforma</th>
+                <th>Proyecto</th>
+                <th>Nombre de campaña</th>
+                <th>ID transacción / N° factura</th>
+                <th class="amount">Monto</th>
+              </tr>
+            </thead>
+            <tbody id="rsd-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="./data/invoices.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="./reason-social-detail.js"></script>
+  </body>
+</html>
