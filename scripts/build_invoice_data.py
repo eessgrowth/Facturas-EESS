@@ -62,6 +62,14 @@ DATE_DMY_RE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 DATE_DMONY_RE = re.compile(r"^(\d{1,2})\s+([a-zA-Z]{3})\s+(\d{4})$")
 META_RECEIPT_DATE_RE = re.compile(r"(\d{1,2})\s+([a-zA-Záéíóúñ\.]+)\s+(\d{4})", re.IGNORECASE)
 
+DESGLOSE_BRAND_PREFIXES = [
+    ("Socovesa Santiago", "socovesasantiago"),
+    ("Socovesa Sur", "socovesasur"),
+    ("Socovesa", "socovesa"),
+    ("Almagro", "almagro"),
+    ("Pilares", "pilares"),
+]
+
 
 @dataclass
 class ParseWarning:
@@ -1217,8 +1225,67 @@ def parse_reason_social_sheet(path: Path, warnings: list[ParseWarning]) -> list[
     )
 
 
+def split_desglose_filter(raw_filter: str) -> tuple[str, str, str]:
+    value = raw_filter.strip()
+    if not value:
+        return "", "", ""
+    lowered = value.lower()
+    for prefix, brand_group in DESGLOSE_BRAND_PREFIXES:
+        prefix_lower = prefix.lower()
+        if lowered.startswith(prefix_lower):
+            campaign_name = value[len(prefix) :].strip()
+            return prefix, brand_group, campaign_name
+    return "", "", ""
+
+
+def parse_desglose_por_rs_sheet(path: Path, warnings: list[ParseWarning]) -> list[dict[str, Any]]:
+    try:
+        _, rows = parse_excel_sheet_rows(path, sheet_name="Desglose por RS")
+    except Exception as exc:
+        warnings.append(ParseWarning(source=path.name, message=f"Could not parse 'Desglose por RS' sheet: {exc}"))
+        return []
+
+    mappings: list[dict[str, Any]] = []
+    for row_idx in sorted(rows):
+        row = rows[row_idx]
+        raw_filter = row.get("C", "").strip()
+        comuna = row.get("D", "").strip()
+        project = row.get("E", "").strip()
+        if not raw_filter or not comuna or not project:
+            continue
+        if raw_filter.lower() in {"filtro", "concatenar"}:
+            continue
+
+        brand, brand_group, campaign_name = split_desglose_filter(raw_filter)
+        if not brand_group or not campaign_name:
+            continue
+
+        mappings.append(
+            {
+                "brand": brand,
+                "brandGroup": brand_group,
+                "campaignName": campaign_name,
+                "campaignKey": normalize_key(campaign_name),
+                "comuna": comuna,
+                "project": project,
+            }
+        )
+
+    deduped: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for item in mappings:
+        key = (item["brandGroup"], item["campaignKey"], item["comuna"], item["project"])
+        deduped[key] = item
+
+    return sorted(
+        deduped.values(),
+        key=lambda item: (item["brand"], item["campaignName"], item["comuna"], item["project"]),
+    )
+
+
 def build_reason_social_rows(
-    invoices: list[dict[str, Any]], reason_social_mappings: list[dict[str, Any]]
+    invoices: list[dict[str, Any]],
+    reason_social_mappings: list[dict[str, Any]],
+    campaign_desglose_mappings: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     def extract_special_charges(invoice: dict[str, Any]) -> list[dict[str, Any]]:
         charges: list[dict[str, Any]] = []
@@ -1291,11 +1358,17 @@ def build_reason_social_rows(
 
     by_brand_campaign: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     by_campaign: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    by_brand_campaign_desglose: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    by_campaign_desglose: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     for mapping in reason_social_mappings:
         key = (mapping["brandGroup"], mapping["campaignKey"])
         by_brand_campaign[key].append(mapping)
         by_campaign[mapping["campaignKey"]].append(mapping)
+    for mapping in campaign_desglose_mappings:
+        key = (mapping["brandGroup"], mapping["campaignKey"])
+        by_brand_campaign_desglose[key].append(mapping)
+        by_campaign_desglose[mapping["campaignKey"]].append(mapping)
 
     rows: list[dict[str, Any]] = []
     for invoice in invoices:
@@ -1367,6 +1440,7 @@ def build_reason_social_rows(
             project = "Sin asignar"
             mapping_brand = ""
             split_assignments: list[dict[str, Any]] = []
+            sorted_candidates: list[dict[str, Any]] = []
             if candidates:
                 sorted_candidates = sorted(
                     candidates,
@@ -1382,43 +1456,51 @@ def build_reason_social_rows(
                 project = str(sorted_candidates[0].get("project", "")).strip() or "Sin asignar"
                 mapping_brand = sorted_candidates[0]["brand"]
 
-                split_candidates: list[dict[str, str]] = []
-                seen_split_keys: set[tuple[str, str, str]] = set()
+            desglose_pool: list[dict[str, Any]] = []
+            for alias in brand_group_aliases(brand_group):
+                desglose_pool.extend(by_brand_campaign_desglose.get((alias, campaign_key), []))
+            if not desglose_pool:
+                fallback_desglose = by_campaign_desglose.get(campaign_key, [])
+                if len({item["brandGroup"] for item in fallback_desglose}) == 1:
+                    desglose_pool = fallback_desglose
+
+            split_candidates: list[tuple[str, str]] = []
+            seen_split_keys: set[tuple[str, str]] = set()
+            for candidate in sorted(
+                desglose_pool,
+                key=lambda item: (item.get("comuna", ""), item.get("project", ""), item.get("brand", "")),
+            ):
+                split_comuna = str(candidate.get("comuna", "")).strip() or "Sin asignar"
+                split_project = str(candidate.get("project", "")).strip() or "Sin asignar"
+                split_key = (split_comuna, split_project)
+                if split_key in seen_split_keys:
+                    continue
+                seen_split_keys.add(split_key)
+                split_candidates.append(split_key)
+
+            if not split_candidates and sorted_candidates:
                 for candidate in sorted_candidates:
-                    split_legal_entity = str(candidate.get("legalEntity", "")).strip() or "Sin asignar"
                     split_comuna = str(candidate.get("comuna", "")).strip() or "Sin asignar"
                     split_project = str(candidate.get("project", "")).strip() or "Sin asignar"
-                    split_key = (split_legal_entity, split_comuna, split_project)
+                    split_key = (split_comuna, split_project)
                     if split_key in seen_split_keys:
                         continue
                     seen_split_keys.add(split_key)
-                    split_candidates.append(
-                        {
-                            "legalEntity": split_legal_entity,
-                            "comuna": split_comuna,
-                            "project": split_project,
-                        }
-                    )
+                    split_candidates.append(split_key)
 
-                split_amounts = split_amount_evenly(amount, len(split_candidates))
-                split_assignments = [
-                    {
-                        "legalEntity": split_candidates[idx]["legalEntity"],
-                        "comuna": split_candidates[idx]["comuna"],
-                        "project": split_candidates[idx]["project"],
-                        "amount": split_amounts[idx],
-                    }
-                    for idx in range(len(split_candidates))
-                ]
-            else:
-                split_assignments = [
-                    {
-                        "legalEntity": legal_entity,
-                        "comuna": comuna,
-                        "project": project,
-                        "amount": amount,
-                    }
-                ]
+            if not split_candidates:
+                split_candidates = [(comuna, project)]
+
+            split_amounts = split_amount_evenly(amount, len(split_candidates))
+            split_assignments = [
+                {
+                    "legalEntity": legal_entity,
+                    "comuna": split_candidates[idx][0],
+                    "project": split_candidates[idx][1],
+                    "amount": split_amounts[idx],
+                }
+                for idx in range(len(split_candidates))
+            ]
 
             rows.append(
                 {
@@ -1617,6 +1699,7 @@ def main() -> None:
     invoices: list[dict[str, Any]] = []
     rs_rules: list[dict[str, Any]] = []
     reason_social_mappings: list[dict[str, Any]] = []
+    campaign_desglose_mappings: list[dict[str, Any]] = []
     google_files = sorted(PDF_DIR.glob("*GoogleAds.pdf"))
     meta_files = sorted(PDF_DIR.glob("*Meta*.pdf"))
 
@@ -1636,6 +1719,7 @@ def main() -> None:
             invoices.extend(parse_zeppelin_excel(file, warnings, document_file=file.name))
             rs_rules.extend(parse_rs_excel(file, warnings))
             reason_social_mappings.extend(parse_reason_social_sheet(file, warnings))
+            campaign_desglose_mappings.extend(parse_desglose_por_rs_sheet(file, warnings))
     else:
         existing_invoices = existing_data.get("invoices", []) if isinstance(existing_data, dict) else []
         carried_zeppelin = [item for item in existing_invoices if item.get("platform") == "Agencia Zeppelin"]
@@ -1646,9 +1730,14 @@ def main() -> None:
             if isinstance(existing_data.get("reasonSocialMappings"), list)
             else []
         )
+        campaign_desglose_mappings = (
+            existing_data.get("campaignDesgloseMappings", [])
+            if isinstance(existing_data.get("campaignDesgloseMappings"), list)
+            else []
+        )
 
     invoices.sort(key=lambda item: (item["month"], item["platform"], item["brand"], item["invoiceDate"]))
-    reason_social_rows = build_reason_social_rows(invoices, reason_social_mappings)
+    reason_social_rows = build_reason_social_rows(invoices, reason_social_mappings, campaign_desglose_mappings)
 
     known_brand_order = [
         "Almagro Inmobiliaria",
@@ -1673,6 +1762,7 @@ def main() -> None:
         "platforms": platforms,
         "rsRules": rs_rules,
         "reasonSocialMappings": reason_social_mappings,
+        "campaignDesgloseMappings": campaign_desglose_mappings,
         "reasonSocialRows": reason_social_rows,
     }
 
