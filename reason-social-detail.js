@@ -29,6 +29,7 @@ const tableBody = document.getElementById("rsd-table-body");
 const exportXlsxBtn = document.getElementById("rsd-export-xlsx");
 const exportPdfBtn = document.getElementById("rsd-export-pdf");
 let currentFilteredRows = [];
+const expandedRowIds = new Set();
 
 const clpFormatter = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -79,16 +80,20 @@ function exportTableXlsx(rows) {
 
   const sortedRows = toExportRows(rows);
   const headers = [
+    "Mes",
     "Razón social",
     "Plataforma",
+    "Comuna",
     "Proyecto",
     "Nombre de campaña",
     "ID transacción / N° factura",
     "Monto",
   ];
   const body = sortedRows.map((row) => [
+    toMonthLabel(row.monthKey),
     row.legalEntity,
     row.platform,
+    row.comuna,
     row.project,
     row.campaignName,
     row.referenceId,
@@ -96,12 +101,12 @@ function exportTableXlsx(rows) {
   ]);
 
   const totalAmount = sortedRows.reduce((sum, row) => sum + row.amount, 0);
-  body.push(["TOTAL", "-", "-", "-", "-", totalAmount]);
+  body.push(["-", "TOTAL", "-", "-", "-", "-", "-", totalAmount]);
 
   const worksheet = window.XLSX.utils.aoa_to_sheet([headers, ...body]);
-  worksheet["!cols"] = [{ wch: 34 }, { wch: 14 }, { wch: 20 }, { wch: 46 }, { wch: 30 }, { wch: 16 }];
+  worksheet["!cols"] = [{ wch: 18 }, { wch: 30 }, { wch: 14 }, { wch: 20 }, { wch: 20 }, { wch: 40 }, { wch: 30 }, { wch: 16 }];
   for (let rowIndex = 2; rowIndex <= body.length + 1; rowIndex += 1) {
-    const amountCell = worksheet[`F${rowIndex}`];
+    const amountCell = worksheet[`H${rowIndex}`];
     if (amountCell) amountCell.z = '"$"#,##0';
   }
 
@@ -127,14 +132,16 @@ function exportTablePdf(rows) {
   const sortedRows = toExportRows(rows);
   const totalAmount = sortedRows.reduce((sum, row) => sum + row.amount, 0);
   const body = sortedRows.map((row) => [
+    toMonthLabel(row.monthKey),
     row.legalEntity,
     row.platform,
+    row.comuna,
     row.project,
     row.campaignName,
     row.referenceId,
     formatCLP(row.amount),
   ]);
-  body.push(["TOTAL", "-", "-", "-", "-", formatCLP(totalAmount)]);
+  body.push(["-", "TOTAL", "-", "-", "-", "-", "-", formatCLP(totalAmount)]);
 
   doc.setFontSize(13);
   doc.text("Detalle por Razón Social", 40, 36);
@@ -143,11 +150,22 @@ function exportTablePdf(rows) {
 
   doc.autoTable({
     startY: 68,
-    head: [["Razón social", "Plataforma", "Proyecto", "Nombre de campaña", "ID transacción / N° factura", "Monto"]],
+    head: [
+      [
+        "Mes",
+        "Razón social",
+        "Plataforma",
+        "Comuna",
+        "Proyecto",
+        "Nombre de campaña",
+        "ID transacción / N° factura",
+        "Monto",
+      ],
+    ],
     body,
     styles: { fontSize: 8, cellPadding: 5 },
     headStyles: { fillColor: [31, 31, 31] },
-    columnStyles: { 5: { halign: "right" } },
+    columnStyles: { 7: { halign: "right" } },
     didParseCell(hookData) {
       if (hookData.section === "body" && hookData.row.index === body.length - 1) {
         hookData.cell.styles.fontStyle = "bold";
@@ -208,24 +226,50 @@ function fillSelect(select, options, allLabel, mapLabel = null) {
 function extractRows() {
   const sourceRows = Array.isArray(data.reasonSocialRows) ? data.reasonSocialRows : [];
   return sourceRows
-    .map((row) => {
+    .map((row, index) => {
       const platform = normalizeText(row.platform);
       const monthKey = getMonthKey(row.month) || getMonthKey(row.invoiceDate);
       const year = monthKey ? monthKey.slice(0, 4) : "";
       const referenceType =
         normalizeText(row.referenceType) || (platform === "Meta" ? "transactionId" : "invoiceNumber");
       const referenceId = normalizeText(row.referenceId || row.invoiceId);
+      const splitAssignmentsRaw = Array.isArray(row.splitAssignments) ? row.splitAssignments : [];
+      const splitAssignments =
+        splitAssignmentsRaw.length > 0
+          ? splitAssignmentsRaw
+              .map((splitRow) => ({
+                legalEntity: normalizeText(splitRow.legalEntity) || "Sin asignar",
+                comuna: normalizeText(splitRow.comuna) || "Sin asignar",
+                project: normalizeText(splitRow.project) || "Sin asignar",
+                amount: Number(splitRow.amount || 0),
+              }))
+          : [];
+      const normalizedSplitAssignments =
+        splitAssignments.length > 0
+          ? splitAssignments
+          : [
+              {
+                legalEntity: normalizeText(row.legalEntity) || "Sin asignar",
+                comuna: normalizeText(row.comuna) || "Sin asignar",
+                project: normalizeText(row.project) || "Sin asignar",
+                amount: Number(row.amount || 0),
+              },
+            ];
+
       return {
+        rowId: `${normalizeText(row.invoiceId)}|${platform}|${normalizeText(row.brand)}|${normalizeText(row.campaignName)}|${referenceId}|${index}`,
         legalEntity: normalizeText(row.legalEntity) || "Sin asignar",
         platform: platform || "-",
         brand: normalizeText(row.brand) || "-",
         monthKey,
         year,
+        comuna: normalizeText(row.comuna) || "Sin asignar",
         project: normalizeText(row.project) || "Sin asignar",
         campaignName: normalizeText(row.campaignName) || "-",
         referenceType,
         referenceId: referenceId || "-",
         amount: Number(row.amount || 0),
+        splitAssignments: normalizedSplitAssignments,
       };
     })
     .filter((row) => row.platform === "Meta" || row.platform === "Google Ads");
@@ -263,6 +307,7 @@ function getFilteredRows() {
       const haystack = [
         row.legalEntity,
         row.platform,
+        row.comuna,
         row.project,
         row.campaignName,
         row.referenceId,
@@ -290,22 +335,55 @@ function render(rows) {
   if (exportPdfBtn) exportPdfBtn.disabled = visibleRows.length === 0;
 
   if (!visibleRows.length) {
-    tableBody.innerHTML = '<tr><td colspan="6" class="empty">No hay filas para los filtros seleccionados.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="8" class="empty">No hay filas para los filtros seleccionados.</td></tr>';
     return;
   }
 
   tableBody.innerHTML = visibleRows
-    .map(
-      (row) => `
-      <tr>
+    .map((row) => {
+      const splitRows = Array.isArray(row.splitAssignments) ? row.splitAssignments : [];
+      const hasSplit = splitRows.length > 1;
+      const isExpanded = hasSplit && expandedRowIds.has(row.rowId);
+      const toggleButton = hasSplit
+        ? `<button class="rsd-expand-toggle" type="button" data-row-id="${esc(row.rowId)}" aria-expanded="${isExpanded ? "true" : "false"}">${isExpanded ? "Ocultar apertura" : `Aperturar (${splitRows.length})`}</button>`
+        : "";
+      const mainRow = `
+      <tr class="rsd-main-row">
+        <td>${esc(toMonthLabel(row.monthKey))}</td>
         <td>${esc(row.legalEntity)}</td>
         <td>${esc(row.platform)}</td>
+        <td>${esc(row.comuna)}</td>
         <td>${esc(row.project)}</td>
-        <td>${esc(row.campaignName)}</td>
+        <td>
+          <div class="rsd-campaign-cell">
+            <span>${esc(row.campaignName)}</span>
+            ${toggleButton}
+          </div>
+        </td>
         <td>${esc(row.referenceId)}</td>
         <td class="amount">${formatCLP(row.amount)}</td>
+      </tr>`;
+
+      if (!isExpanded) return mainRow;
+
+      const breakdownRows = splitRows
+        .map(
+          (splitRow, splitIndex) => `
+      <tr class="rsd-split-row">
+        <td>${esc(toMonthLabel(row.monthKey))}</td>
+        <td>${esc(splitRow.legalEntity)}</td>
+        <td>${esc(row.platform)}</td>
+        <td>${esc(splitRow.comuna)}</td>
+        <td>${esc(splitRow.project)}</td>
+        <td><span class="rsd-split-label">Apertura ${splitIndex + 1}/${splitRows.length}</span> ${esc(row.campaignName)}</td>
+        <td>${esc(row.referenceId)}</td>
+        <td class="amount">${formatCLP(splitRow.amount)}</td>
       </tr>`
-    )
+        )
+        .join("");
+
+      return mainRow + breakdownRows;
+    })
     .join("");
 }
 
@@ -334,6 +412,19 @@ function attachEvents() {
     state.search = event.target.value;
     render(getFilteredRows());
   });
+  tableBody?.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest(".rsd-expand-toggle");
+    if (!button) return;
+    const rowId = normalizeText(button.dataset.rowId);
+    if (!rowId) return;
+    if (expandedRowIds.has(rowId)) {
+      expandedRowIds.delete(rowId);
+    } else {
+      expandedRowIds.add(rowId);
+    }
+    render(getFilteredRows());
+  });
   controls.clear?.addEventListener("click", () => {
     state.platform = "";
     state.brand = "";
@@ -348,6 +439,7 @@ function attachEvents() {
     if (controls.year) controls.year.value = "";
     if (controls.legalEntity) controls.legalEntity.value = "";
     if (controls.search) controls.search.value = "";
+    expandedRowIds.clear();
 
     render(getFilteredRows());
   });

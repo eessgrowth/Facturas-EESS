@@ -1186,7 +1186,8 @@ def parse_reason_social_sheet(path: Path, warnings: list[ParseWarning]) -> list[
         brand = row.get("C", "").strip()
         campaign = row.get("D", "").strip()
         legal_entity = row.get("E", "").strip()
-        project = row.get("F", "").strip()
+        comuna = row.get("F", "").strip()
+        project = row.get("G", "").strip()
 
         if not brand or not campaign or not legal_entity:
             continue
@@ -1200,18 +1201,19 @@ def parse_reason_social_sheet(path: Path, warnings: list[ParseWarning]) -> list[
                 "campaignName": campaign,
                 "campaignKey": normalize_key(campaign),
                 "legalEntity": legal_entity,
+                "comuna": comuna,
                 "project": project,
             }
         )
 
-    deduped: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    deduped: dict[tuple[str, str, str, str, str], dict[str, Any]] = {}
     for item in mappings:
-        key = (item["brandGroup"], item["campaignKey"], item["legalEntity"], item["project"])
+        key = (item["brandGroup"], item["campaignKey"], item["legalEntity"], item["comuna"], item["project"])
         deduped[key] = item
 
     return sorted(
         deduped.values(),
-        key=lambda item: (item["brand"], item["campaignName"], item["legalEntity"], item["project"]),
+        key=lambda item: (item["brand"], item["campaignName"], item["legalEntity"], item["comuna"], item["project"]),
     )
 
 
@@ -1280,6 +1282,13 @@ def build_reason_social_rows(
 
         return lines
 
+    def split_amount_evenly(total_amount: int, bucket_count: int) -> list[int]:
+        if bucket_count <= 0:
+            return []
+        base = total_amount // bucket_count
+        remainder = total_amount % bucket_count
+        return [base + (1 if idx < remainder else 0) for idx in range(bucket_count)]
+
     by_brand_campaign: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     by_campaign: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
@@ -1312,13 +1321,14 @@ def build_reason_social_rows(
                 candidate_pool.extend(by_brand_campaign.get((alias, campaign_key), []))
 
             # Deduplicate keeping deterministic order.
-            seen_candidate_keys: set[tuple[str, str, str, str]] = set()
+            seen_candidate_keys: set[tuple[str, str, str, str, str]] = set()
             candidates: list[dict[str, Any]] = []
             for candidate in candidate_pool:
                 candidate_key = (
                     str(candidate.get("brandGroup", "")),
                     str(candidate.get("campaignKey", "")),
                     str(candidate.get("legalEntity", "")),
+                    str(candidate.get("comuna", "")),
                     str(candidate.get("project", "")),
                 )
                 if candidate_key in seen_candidate_keys:
@@ -1353,16 +1363,62 @@ def build_reason_social_rows(
                     candidates = fallback
 
             legal_entity = "Sin asignar"
+            comuna = "Sin asignar"
             project = "Sin asignar"
             mapping_brand = ""
+            split_assignments: list[dict[str, Any]] = []
             if candidates:
                 sorted_candidates = sorted(
                     candidates,
-                    key=lambda item: (item.get("legalEntity", ""), item.get("project", ""), item.get("brand", "")),
+                    key=lambda item: (
+                        item.get("legalEntity", ""),
+                        item.get("comuna", ""),
+                        item.get("project", ""),
+                        item.get("brand", ""),
+                    ),
                 )
                 legal_entity = sorted_candidates[0]["legalEntity"]
+                comuna = str(sorted_candidates[0].get("comuna", "")).strip() or "Sin asignar"
                 project = str(sorted_candidates[0].get("project", "")).strip() or "Sin asignar"
                 mapping_brand = sorted_candidates[0]["brand"]
+
+                split_candidates: list[dict[str, str]] = []
+                seen_split_keys: set[tuple[str, str, str]] = set()
+                for candidate in sorted_candidates:
+                    split_legal_entity = str(candidate.get("legalEntity", "")).strip() or "Sin asignar"
+                    split_comuna = str(candidate.get("comuna", "")).strip() or "Sin asignar"
+                    split_project = str(candidate.get("project", "")).strip() or "Sin asignar"
+                    split_key = (split_legal_entity, split_comuna, split_project)
+                    if split_key in seen_split_keys:
+                        continue
+                    seen_split_keys.add(split_key)
+                    split_candidates.append(
+                        {
+                            "legalEntity": split_legal_entity,
+                            "comuna": split_comuna,
+                            "project": split_project,
+                        }
+                    )
+
+                split_amounts = split_amount_evenly(amount, len(split_candidates))
+                split_assignments = [
+                    {
+                        "legalEntity": split_candidates[idx]["legalEntity"],
+                        "comuna": split_candidates[idx]["comuna"],
+                        "project": split_candidates[idx]["project"],
+                        "amount": split_amounts[idx],
+                    }
+                    for idx in range(len(split_candidates))
+                ]
+            else:
+                split_assignments = [
+                    {
+                        "legalEntity": legal_entity,
+                        "comuna": comuna,
+                        "project": project,
+                        "amount": amount,
+                    }
+                ]
 
             rows.append(
                 {
@@ -1374,20 +1430,24 @@ def build_reason_social_rows(
                     "campaignName": campaign_name,
                     "amount": amount,
                     "legalEntity": legal_entity,
+                    "comuna": comuna,
                     "project": project,
                     "referenceId": reference_id,
                     "referenceType": reference_type,
                     "mappingBrand": mapping_brand,
+                    "splitAssignments": split_assignments,
+                    "splitCount": len(split_assignments),
                     "matched": legal_entity != "Sin asignar",
                 }
             )
 
     brand_top_legal_entity: dict[str, str] = {}
-    brand_top_assignment: dict[str, tuple[str, str]] = {}
+    brand_top_assignment: dict[str, tuple[str, str, str]] = {}
     brand_totals: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    brand_assignment_totals: dict[str, dict[tuple[str, str], int]] = defaultdict(lambda: defaultdict(int))
+    brand_assignment_totals: dict[str, dict[tuple[str, str, str], int]] = defaultdict(lambda: defaultdict(int))
     for row in rows:
         legal_entity = str(row.get("legalEntity", "")).strip()
+        comuna = str(row.get("comuna", "")).strip()
         project = str(row.get("project", "")).strip()
         brand = str(row.get("brand", "")).strip()
         amount = int(row.get("amount", 0) or 0)
@@ -1395,14 +1455,14 @@ def build_reason_social_rows(
             continue
         brand_totals[brand][legal_entity] += amount
         if project and project != "Sin asignar":
-            brand_assignment_totals[brand][(legal_entity, project)] += amount
+            brand_assignment_totals[brand][(legal_entity, comuna or "Sin asignar", project)] += amount
 
     for brand, totals in brand_totals.items():
         sorted_totals = sorted(totals.items(), key=lambda item: (-item[1], item[0]))
         if sorted_totals:
             brand_top_legal_entity[brand] = sorted_totals[0][0]
     for brand, totals in brand_assignment_totals.items():
-        sorted_totals = sorted(totals.items(), key=lambda item: (-item[1], item[0][0], item[0][1]))
+        sorted_totals = sorted(totals.items(), key=lambda item: (-item[1], item[0][0], item[0][1], item[0][2]))
         if sorted_totals:
             brand_top_assignment[brand] = sorted_totals[0][0]
 
@@ -1417,9 +1477,11 @@ def build_reason_social_rows(
 
         brand = str(invoice.get("brand", "")).strip()
         top_legal_entity = brand_top_legal_entity.get(brand, "Sin asignar")
+        top_comuna = "Sin asignar"
         top_project = "Sin asignar"
         if brand in brand_top_assignment:
-            _, mapped_project = brand_top_assignment[brand]
+            _, mapped_comuna, mapped_project = brand_top_assignment[brand]
+            top_comuna = mapped_comuna or "Sin asignar"
             top_project = mapped_project or "Sin asignar"
         reference_type = campaign_reference_type(platform)
         reference_id = str(invoice.get("id", "")).strip()
@@ -1434,10 +1496,20 @@ def build_reason_social_rows(
                     "campaignName": charge["label"],
                     "amount": charge["amount"],
                     "legalEntity": top_legal_entity,
+                    "comuna": top_comuna,
                     "project": top_project,
                     "referenceId": reference_id,
                     "referenceType": reference_type,
                     "mappingBrand": "",
+                    "splitAssignments": [
+                        {
+                            "legalEntity": top_legal_entity,
+                            "comuna": top_comuna,
+                            "project": top_project,
+                            "amount": charge["amount"],
+                        }
+                    ],
+                    "splitCount": 1,
                     "matched": top_legal_entity != "Sin asignar",
                 }
             )
@@ -1449,6 +1521,7 @@ def build_reason_social_rows(
             item["platform"],
             item["brand"],
             item["legalEntity"],
+            item["comuna"],
             item["project"],
             item["campaignName"],
             item["referenceId"],

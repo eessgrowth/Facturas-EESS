@@ -410,6 +410,39 @@ body {
   overflow-x: auto;
 }
 
+.rsd-campaign-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rsd-expand-toggle {
+  align-self: flex-start;
+  border: 1px solid #bcbcbc;
+  border-radius: 999px;
+  background: #f3f3f3;
+  color: var(--ink);
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.rsd-expand-toggle:hover {
+  background: #e8e8e8;
+}
+
+.rsd-split-row td {
+  background: #fafafa;
+  border-top: 1px dashed #d4d4d4;
+}
+
+.rsd-split-label {
+  font-size: 0.73rem;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
 .invoice-body {
   padding: 10px 12px 12px;
 }
