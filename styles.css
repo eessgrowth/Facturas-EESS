@@ -433,13 +433,17 @@ body {
 }
 
 .rsd-split-row td {
-  background: #fafafa;
-  border-top: 1px dashed #d4d4d4;
+  background: #eaf2ff;
+  border-top: 1px dashed #b9c9ea;
+}
+
+.rsd-split-row td:first-child {
+  border-left: 3px solid #6c89c9;
 }
 
 .rsd-split-label {
   font-size: 0.73rem;
-  color: var(--muted);
+  color: #35548f;
   margin-right: 6px;
 }
 

@@ -71,6 +71,45 @@ function toExportRows(rows) {
   return [...rows].sort((a, b) => b.amount - a.amount);
 }
 
+function buildXlsxBodyWithOutline(rows) {
+  const sortedRows = toExportRows(rows);
+  const body = [];
+  const outlineRows = [];
+
+  sortedRows.forEach((row) => {
+    body.push([
+      toMonthLabel(row.monthKey),
+      row.legalEntity,
+      row.platform,
+      row.comuna,
+      row.project,
+      row.campaignName,
+      row.referenceId,
+      row.amount,
+    ]);
+    outlineRows.push({ level: 0 });
+
+    const splits = Array.isArray(row.splitAssignments) ? row.splitAssignments : [];
+    if (splits.length <= 1) return;
+
+    splits.forEach((split, splitIndex) => {
+      body.push([
+        toMonthLabel(row.monthKey),
+        split.legalEntity,
+        row.platform,
+        split.comuna,
+        split.project,
+        `Apertura ${splitIndex + 1}/${splits.length} - ${row.campaignName}`,
+        row.referenceId,
+        split.amount,
+      ]);
+      outlineRows.push({ level: 1, hidden: true });
+    });
+  });
+
+  return { body, outlineRows, sortedRows };
+}
+
 function exportTableXlsx(rows) {
   if (!rows.length) return;
   if (!window.XLSX) {
@@ -78,7 +117,7 @@ function exportTableXlsx(rows) {
     return;
   }
 
-  const sortedRows = toExportRows(rows);
+  const { body, outlineRows, sortedRows } = buildXlsxBodyWithOutline(rows);
   const headers = [
     "Mes",
     "Razón social",
@@ -89,22 +128,18 @@ function exportTableXlsx(rows) {
     "ID transacción / N° factura",
     "Monto",
   ];
-  const body = sortedRows.map((row) => [
-    toMonthLabel(row.monthKey),
-    row.legalEntity,
-    row.platform,
-    row.comuna,
-    row.project,
-    row.campaignName,
-    row.referenceId,
-    row.amount,
-  ]);
 
   const totalAmount = sortedRows.reduce((sum, row) => sum + row.amount, 0);
   body.push(["-", "TOTAL", "-", "-", "-", "-", "-", totalAmount]);
+  outlineRows.push({ level: 0 });
 
   const worksheet = window.XLSX.utils.aoa_to_sheet([headers, ...body]);
   worksheet["!cols"] = [{ wch: 18 }, { wch: 30 }, { wch: 14 }, { wch: 20 }, { wch: 20 }, { wch: 40 }, { wch: 30 }, { wch: 16 }];
+  worksheet["!outline"] = { above: false, left: false };
+  worksheet["!rows"] = [{}];
+  outlineRows.forEach((meta) => {
+    worksheet["!rows"].push(meta);
+  });
   for (let rowIndex = 2; rowIndex <= body.length + 1; rowIndex += 1) {
     const amountCell = worksheet[`H${rowIndex}`];
     if (amountCell) amountCell.z = '"$"#,##0';
