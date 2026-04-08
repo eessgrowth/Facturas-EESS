@@ -165,6 +165,7 @@ function buildXlsxBodyWithOutline(rows) {
       row.referenceId,
       formatDate(row.paymentDate),
       row.paymentReference || "-",
+      row.chargeCode || "-",
       rowChargeTc,
       toOptionalNumber(row.chargeAmountOriginal),
       toOptionalNumber(row.chargeAmountUsd),
@@ -191,6 +192,7 @@ function buildXlsxBodyWithOutline(rows) {
         row.referenceId,
         formatDate(row.paymentDate),
         row.paymentReference || "-",
+        row.chargeCode || "-",
         splitChargeAllocations[splitIndex] || 0,
         toOptionalNumber(row.chargeAmountOriginal),
         toOptionalNumber(row.chargeAmountUsd),
@@ -222,7 +224,8 @@ function exportTableXlsx(rows) {
     "ID transacción / N° factura",
     "Fecha de pago",
     "N° referencia",
-    "Cobro TC",
+    "Código (Descripción del cobro)",
+    "Desglose Cobro TC",
     "Monto moneda origen",
     "Monto US$",
     "Validación monto",
@@ -232,7 +235,7 @@ function exportTableXlsx(rows) {
   const totalAmount = sortedRows.reduce((sum, row) => sum + row.amount, 0);
   const totalChargeTc = sortedRows.reduce((sum, row) => sum + (toOptionalNumber(row.chargeTcAmount) || 0), 0);
   const { totalOrigin, totalUsd } = getUniqueCardChargeTotals(sortedRows);
-  body.push(["-", "TOTAL", "-", "-", "-", "-", "-", "-", "-", totalChargeTc, totalOrigin, totalUsd, "-", totalAmount]);
+  body.push(["-", "TOTAL", "-", "-", "-", "-", "-", "-", "-", "-", totalChargeTc, totalOrigin, totalUsd, "-", totalAmount]);
   outlineRows.push({ level: 0 });
 
   const worksheet = window.XLSX.utils.aoa_to_sheet([headers, ...body]);
@@ -246,6 +249,7 @@ function exportTableXlsx(rows) {
     { wch: 30 },
     { wch: 16 },
     { wch: 16 },
+    { wch: 26 },
     { wch: 28 },
     { wch: 18 },
     { wch: 14 },
@@ -258,13 +262,13 @@ function exportTableXlsx(rows) {
     worksheet["!rows"].push(meta);
   });
   for (let rowIndex = 2; rowIndex <= body.length + 1; rowIndex += 1) {
-    const tcCell = worksheet[`J${rowIndex}`];
+    const tcCell = worksheet[`K${rowIndex}`];
     if (tcCell && typeof tcCell.v === "number") tcCell.z = '"$"#,##0';
-    const originCell = worksheet[`K${rowIndex}`];
+    const originCell = worksheet[`L${rowIndex}`];
     if (originCell && typeof originCell.v === "number") originCell.z = '"$"#,##0';
-    const usdCell = worksheet[`L${rowIndex}`];
+    const usdCell = worksheet[`M${rowIndex}`];
     if (usdCell && typeof usdCell.v === "number") usdCell.z = '"US$"#,##0.00';
-    const amountCell = worksheet[`N${rowIndex}`];
+    const amountCell = worksheet[`O${rowIndex}`];
     if (amountCell) amountCell.z = '"$"#,##0';
   }
 
@@ -301,6 +305,7 @@ function exportTablePdf(rows) {
     row.referenceId,
     formatDate(row.paymentDate),
     row.paymentReference || "-",
+    row.chargeCode || "-",
     formatOptionalCLP(row.chargeTcAmount),
     formatOptionalCLP(row.chargeAmountOriginal),
     formatUSD(row.chargeAmountUsd),
@@ -310,6 +315,7 @@ function exportTablePdf(rows) {
   body.push([
     "-",
     "TOTAL",
+    "-",
     "-",
     "-",
     "-",
@@ -342,7 +348,8 @@ function exportTablePdf(rows) {
         "ID transacción / N° factura",
         "Fecha de pago",
         "N° referencia",
-        "Cobro TC",
+        "Código (Descripción del cobro)",
+        "Desglose Cobro TC",
         "Monto moneda origen",
         "Monto US$",
         "Validación monto",
@@ -352,7 +359,7 @@ function exportTablePdf(rows) {
     body,
     styles: { fontSize: 8, cellPadding: 5 },
     headStyles: { fillColor: [31, 31, 31] },
-    columnStyles: { 9: { halign: "right" }, 10: { halign: "right" }, 11: { halign: "right" }, 13: { halign: "right" } },
+    columnStyles: { 10: { halign: "right" }, 11: { halign: "right" }, 12: { halign: "right" }, 14: { halign: "right" } },
     didParseCell(hookData) {
       if (hookData.section === "body" && hookData.row.index === body.length - 1) {
         hookData.cell.styles.fontStyle = "bold";
@@ -543,7 +550,7 @@ function render(rows) {
   if (exportPdfBtn) exportPdfBtn.disabled = visibleRows.length === 0;
 
   if (!visibleRows.length) {
-    tableBody.innerHTML = '<tr><td colspan="14" class="empty">No hay filas para los filtros seleccionados.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="15" class="empty">No hay filas para los filtros seleccionados.</td></tr>';
     return;
   }
 
@@ -575,6 +582,7 @@ function render(rows) {
         <td>${esc(row.referenceId)}</td>
         <td>${esc(formatDate(row.paymentDate))}</td>
         <td>${esc(row.paymentReference)}</td>
+        <td>${esc(row.chargeCode)}</td>
         <td class="amount">${formatOptionalCLP(row.chargeTcAmount)}</td>
         <td class="amount">${formatOptionalCLP(row.chargeAmountOriginal)}</td>
         <td class="amount">${formatUSD(row.chargeAmountUsd)}</td>
@@ -597,6 +605,7 @@ function render(rows) {
         <td>${esc(row.referenceId)}</td>
         <td>${esc(formatDate(row.paymentDate))}</td>
         <td>${esc(row.paymentReference)}</td>
+        <td>${esc(row.chargeCode)}</td>
         <td class="amount">${formatOptionalCLP(splitChargeAllocations[splitIndex] || 0)}</td>
         <td class="amount">${formatOptionalCLP(row.chargeAmountOriginal)}</td>
         <td class="amount">${formatUSD(row.chargeAmountUsd)}</td>
@@ -614,6 +623,7 @@ function render(rows) {
     <tr class="rsd-total-row">
       <td>-</td>
       <td><strong>TOTAL</strong></td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
