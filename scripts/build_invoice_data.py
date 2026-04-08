@@ -23,6 +23,7 @@ from pypdf import PdfReader
 ROOT = Path(__file__).resolve().parent.parent
 PDF_DIR = ROOT / "pdfs"
 META_INVOICES_DIR = ROOT / "Facturas Meta"
+META_CARD_STATEMENTS_DIR = META_INVOICES_DIR / "Cartola TC"
 DATA_DIR = ROOT / "data"
 JSON_OUT = DATA_DIR / "invoices.json"
 JS_OUT = DATA_DIR / "invoices.js"
@@ -61,6 +62,8 @@ SPANISH_MONTHS = {
 DATE_DMY_RE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 DATE_DMONY_RE = re.compile(r"^(\d{1,2})\s+([a-zA-Z]{3})\s+(\d{4})$")
 META_RECEIPT_DATE_RE = re.compile(r"(\d{1,2})\s+([a-zA-Záéíóúñ\.]+)\s+(\d{4})", re.IGNORECASE)
+FACEBK_CODE_RE = re.compile(r"FACEBK\s*\*([A-Z0-9]{8,12})", re.IGNORECASE)
+DECIMAL_COMMA_RE = re.compile(r"\d{1,3}(?:\.\d{3})*,\d{2}")
 
 DESGLOSE_BRAND_PREFIXES = [
     ("Socovesa Santiago", "socovesasantiago"),
@@ -191,6 +194,16 @@ def clp_to_int(value: str) -> int:
         return sign * int(round(float(normalized)))
 
     return sign * int(re.sub(r"[^\d]", "", clean))
+
+
+def decimal_comma_to_float(value: str) -> float:
+    clean = str(value).strip().replace(".", "").replace(",", ".")
+    if not clean:
+        return 0.0
+    try:
+        return float(clean)
+    except ValueError:
+        return 0.0
 
 
 def iso_from_dmy(value: str) -> str:
@@ -543,6 +556,7 @@ def parse_meta_receipt_pdf(path: Path, warnings: list[ParseWarning], month_hint:
     amount_m = re.search(r"(Pagado|Fondos agregados)\s*[:|]?\s*\$([\d\.,]+)", flat, re.IGNORECASE)
     account_m = re.search(r"Identificador de la cuenta\s*[:|]?\s*([0-9]+)", flat, re.IGNORECASE)
     method_m = re.search(r"Método de pago\s*[:|]?\s*([^|]+)", flat, re.IGNORECASE)
+    payment_reference_m = re.search(r"Número de referencia\s*[:|]?\s*([A-Za-z0-9]+)", flat, re.IGNORECASE)
     date_m = re.search(
         r"Fecha de nota de pago pendiente/comprobante de pago\s*[:|]?\s*([0-9]{1,2}\s+[a-zA-Záéíóúñ\.]+\s+[0-9]{4})",
         flat,
@@ -587,6 +601,7 @@ def parse_meta_receipt_pdf(path: Path, warnings: list[ParseWarning], month_hint:
         "date": date_iso,
         "transactionId": tx_id,
         "paymentMethod": method_m.group(1).strip() if method_m else "No disponible",
+        "paymentReference": payment_reference_m.group(1).strip().upper() if payment_reference_m else "",
         "status": status,
         "amount": amount,
         "accountId": account_m.group(1).strip() if account_m else "",
@@ -640,6 +655,7 @@ def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> 
                         "date": parsed["date"],
                         "transactionId": tx_id,
                         "paymentMethod": parsed["paymentMethod"],
+                        "paymentReference": parsed.get("paymentReference", ""),
                         "status": parsed["status"],
                         "amount": parsed["amount"],
                         "sourceFile": parsed["sourceFile"],
@@ -656,6 +672,7 @@ def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> 
                                 "amount": campaign_amount,
                                 "transactionId": tx_id,
                                 "date": parsed["date"],
+                                "paymentReference": parsed.get("paymentReference", ""),
                             }
                         )
 
@@ -715,6 +732,121 @@ def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> 
             }
         )
     return invoices
+
+
+def extract_card_statement_text(path: Path, warnings: list[ParseWarning]) -> str:
+    text = extract_text_pypdf(path)
+    if len(re.sub(r"\s+", "", text)) >= 200 and "FACEBK" in text.upper():
+        return text
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="meta-cartola-ocr-") as tmp_dir:
+            prefix = Path(tmp_dir) / "page"
+            subprocess.run(
+                ["pdftoppm", "-png", "-r", "250", str(path), str(prefix)],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            images = sorted(Path(tmp_dir).glob("page-*.png"))
+            if not images:
+                warnings.append(ParseWarning(source=path.name, message="OCR fallback did not produce page images."))
+                return text
+
+            chunks: list[str] = []
+            for image in images:
+                page_text = subprocess.check_output(
+                    ["tesseract", str(image), "stdout", "-l", "spa+eng", "--psm", "6"],
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                )
+                chunks.append(page_text)
+            ocr_text = "\n".join(chunks)
+            if len(re.sub(r"\s+", "", ocr_text)) >= len(re.sub(r"\s+", "", text)):
+                return ocr_text
+    except FileNotFoundError:
+        warnings.append(
+            ParseWarning(
+                source=path.name,
+                message="OCR fallback unavailable (missing 'pdftoppm' or 'tesseract' in PATH).",
+            )
+        )
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        warnings.append(ParseWarning(source=path.name, message=f"OCR fallback failed: {exc}"))
+
+    return text
+
+
+def parse_meta_card_statement_charges(root_dir: Path, warnings: list[ParseWarning]) -> dict[str, dict[str, Any]]:
+    if not root_dir.exists():
+        return {}
+
+    charges_by_code: dict[str, dict[str, Any]] = {}
+    for pdf_file in sorted(root_dir.glob("*.pdf")):
+        text = extract_card_statement_text(pdf_file, warnings)
+        if not text:
+            continue
+
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        parsed_rows = 0
+        for idx, raw_line in enumerate(lines):
+            line = " ".join(raw_line.split())
+            code_match = FACEBK_CODE_RE.search(line.upper())
+            if not code_match:
+                continue
+
+            charge_code = code_match.group(1).upper()
+            tail = line[code_match.end() :]
+            amount_tokens = DECIMAL_COMMA_RE.findall(tail)
+            if len(amount_tokens) < 2:
+                amount_tokens = DECIMAL_COMMA_RE.findall(line)
+            if len(amount_tokens) < 2 and idx + 1 < len(lines):
+                amount_tokens.extend(DECIMAL_COMMA_RE.findall(lines[idx + 1]))
+            if len(amount_tokens) < 2:
+                continue
+
+            amount_origin_raw = amount_tokens[-2]
+            amount_usd_raw = amount_tokens[-1]
+            amount_origin = clp_to_int(amount_origin_raw)
+            amount_usd = decimal_comma_to_float(amount_usd_raw)
+
+            if amount_origin <= 0:
+                continue
+
+            parsed_rows += 1
+            entry = {
+                "chargeCode": charge_code,
+                "descriptionCharge": f"FACEBK *{charge_code}",
+                "amountOriginal": amount_origin,
+                "amountOriginalRaw": amount_origin_raw,
+                "amountUsd": amount_usd,
+                "amountUsdRaw": amount_usd_raw,
+                "sourceFile": str(pdf_file.relative_to(ROOT)),
+            }
+
+            existing = charges_by_code.get(charge_code)
+            if existing and (
+                existing.get("amountOriginal") != entry["amountOriginal"]
+                or existing.get("amountUsdRaw") != entry["amountUsdRaw"]
+            ):
+                warnings.append(
+                    ParseWarning(
+                        source=pdf_file.name,
+                        message=(
+                            f"Duplicate FACEBK code with different amounts: {charge_code} "
+                            f"({existing.get('amountOriginalRaw')}/{existing.get('amountUsdRaw')} vs "
+                            f"{entry['amountOriginalRaw']}/{entry['amountUsdRaw']})."
+                        ),
+                    )
+                )
+            charges_by_code[charge_code] = entry
+
+        if parsed_rows == 0:
+            warnings.append(
+                ParseWarning(source=pdf_file.name, message="No FACEBK charge rows parsed from card statement PDF.")
+            )
+
+    return charges_by_code
 
 
 def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, Any]:
@@ -1337,6 +1469,7 @@ def build_reason_social_rows(
     invoices: list[dict[str, Any]],
     reason_social_mappings: list[dict[str, Any]],
     campaign_desglose_mappings: list[dict[str, Any]],
+    card_charges_by_code: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     def extract_special_charges(invoice: dict[str, Any]) -> list[dict[str, Any]]:
         charges: list[dict[str, Any]] = []
@@ -1369,6 +1502,7 @@ def build_reason_social_rows(
     def extract_campaign_lines(invoice: dict[str, Any], platform: str) -> list[dict[str, Any]]:
         lines: list[dict[str, Any]] = []
         invoice_id = str(invoice.get("id", "")).strip()
+        invoice_date = str(invoice.get("invoiceDate", "")).strip()
 
         if platform == "Meta":
             campaign_details = (
@@ -1378,6 +1512,8 @@ def build_reason_social_rows(
                 campaign_name = str(detail.get("name", "") or detail.get("campaignName", "")).strip()
                 amount = int(detail.get("amount", 0) or 0)
                 transaction_id = str(detail.get("transactionId", "")).strip()
+                payment_date = str(detail.get("date", "")).strip() or invoice_date
+                payment_reference = str(detail.get("paymentReference", "")).strip().upper()
                 if not campaign_name or amount <= 0:
                     continue
                 lines.append(
@@ -1385,6 +1521,8 @@ def build_reason_social_rows(
                         "campaignName": campaign_name,
                         "amount": amount,
                         "referenceId": transaction_id or invoice_id,
+                        "paymentDate": payment_date,
+                        "paymentReference": payment_reference,
                     }
                 )
             if lines:
@@ -1396,7 +1534,15 @@ def build_reason_social_rows(
             amount = int(campaign.get("amount", 0) or 0)
             if not campaign_name or amount <= 0:
                 continue
-            lines.append({"campaignName": campaign_name, "amount": amount, "referenceId": invoice_id})
+            lines.append(
+                {
+                    "campaignName": campaign_name,
+                    "amount": amount,
+                    "referenceId": invoice_id,
+                    "paymentDate": invoice_date,
+                    "paymentReference": "",
+                }
+            )
 
         return lines
 
@@ -1436,8 +1582,18 @@ def build_reason_social_rows(
             campaign_name = str(campaign_line.get("campaignName", "")).strip()
             amount = int(campaign_line.get("amount", 0) or 0)
             reference_id = str(campaign_line.get("referenceId", "")).strip() or str(invoice.get("id", "")).strip()
+            payment_date = str(campaign_line.get("paymentDate", "")).strip() or str(invoice.get("invoiceDate", "")).strip()
+            payment_reference = str(campaign_line.get("paymentReference", "")).strip().upper()
             if not campaign_name or amount <= 0:
                 continue
+
+            card_charge_match = card_charges_by_code.get(payment_reference) if payment_reference else None
+            charge_code = str(card_charge_match.get("chargeCode", "")).strip() if card_charge_match else ""
+            charge_amount_original = (
+                int(card_charge_match.get("amountOriginal", 0) or 0) if card_charge_match else None
+            )
+            charge_amount_usd = float(card_charge_match.get("amountUsd", 0.0) or 0.0) if card_charge_match else None
+            charge_amount_validation = "Pendiente" if charge_amount_original is not None else "Sin match"
 
             campaign_key = normalize_key(campaign_name)
             candidate_pool: list[dict[str, Any]] = []
@@ -1562,6 +1718,12 @@ def build_reason_social_rows(
                     "brand": brand,
                     "campaignName": campaign_name,
                     "amount": amount,
+                    "paymentDate": payment_date,
+                    "paymentReference": payment_reference,
+                    "chargeCode": charge_code,
+                    "chargeAmountOriginal": charge_amount_original,
+                    "chargeAmountUsd": charge_amount_usd,
+                    "chargeAmountValidation": charge_amount_validation,
                     "legalEntity": legal_entity,
                     "comuna": comuna,
                     "project": project,
@@ -1628,6 +1790,12 @@ def build_reason_social_rows(
                     "brand": brand,
                     "campaignName": charge["label"],
                     "amount": charge["amount"],
+                    "paymentDate": invoice.get("invoiceDate", ""),
+                    "paymentReference": "",
+                    "chargeCode": "",
+                    "chargeAmountOriginal": None,
+                    "chargeAmountUsd": None,
+                    "chargeAmountValidation": "Sin match",
                     "legalEntity": top_legal_entity,
                     "comuna": top_comuna,
                     "project": top_project,
@@ -1660,6 +1828,36 @@ def build_reason_social_rows(
             split_project = str(split.get("project", "")).strip()
             split_legal_entity = str(split.get("legalEntity", "")).strip() or row["legalEntity"]
             split["legalEntity"] = override_legal_entity_by_project(split_project, split_legal_entity)
+
+    # Meta validation must compare the card statement amount against the total per reference,
+    # summing all campaign rows that belong to the same payment reference.
+    meta_totals_by_reference: dict[str, int] = defaultdict(int)
+    for row in rows:
+        if str(row.get("platform", "")).strip() != "Meta":
+            continue
+        payment_reference = str(row.get("paymentReference", "")).strip().upper()
+        if not payment_reference:
+            continue
+        if row.get("chargeAmountOriginal") is None:
+            continue
+        meta_totals_by_reference[payment_reference] += int(row.get("amount", 0) or 0)
+
+    for row in rows:
+        if str(row.get("platform", "")).strip() != "Meta":
+            continue
+        payment_reference = str(row.get("paymentReference", "")).strip().upper()
+        if not payment_reference:
+            row["chargeAmountValidation"] = "Sin match"
+            continue
+        if row.get("chargeAmountOriginal") is None:
+            row["chargeAmountValidation"] = "Sin match"
+            continue
+
+        total_by_reference = meta_totals_by_reference.get(payment_reference, 0)
+        row["referenceTotalAmount"] = total_by_reference
+        row["chargeAmountValidation"] = (
+            "Coincide" if total_by_reference == int(row.get("chargeAmountOriginal", 0) or 0) else "No coincide"
+        )
 
     return sorted(
         rows,
@@ -1765,6 +1963,7 @@ def main() -> None:
     rs_rules: list[dict[str, Any]] = []
     reason_social_mappings: list[dict[str, Any]] = []
     campaign_desglose_mappings: list[dict[str, Any]] = []
+    card_charges_by_code: dict[str, dict[str, Any]] = {}
     google_files = sorted(PDF_DIR.glob("*GoogleAds.pdf"))
     meta_files = sorted(PDF_DIR.glob("*Meta*.pdf"))
 
@@ -1774,6 +1973,7 @@ def main() -> None:
     meta_receipt_invoices = parse_meta_receipt_folders(META_INVOICES_DIR, warnings)
     if meta_receipt_invoices:
         invoices.extend(meta_receipt_invoices)
+        card_charges_by_code = parse_meta_card_statement_charges(META_CARD_STATEMENTS_DIR, warnings)
     else:
         for file in meta_files:
             invoices.append(parse_meta_invoice(file, warnings))
@@ -1802,7 +2002,12 @@ def main() -> None:
         )
 
     invoices.sort(key=lambda item: (item["month"], item["platform"], item["brand"], item["invoiceDate"]))
-    reason_social_rows = build_reason_social_rows(invoices, reason_social_mappings, campaign_desglose_mappings)
+    reason_social_rows = build_reason_social_rows(
+        invoices,
+        reason_social_mappings,
+        campaign_desglose_mappings,
+        card_charges_by_code,
+    )
 
     known_brand_order = [
         "Almagro Inmobiliaria",
@@ -1828,6 +2033,7 @@ def main() -> None:
         "rsRules": rs_rules,
         "reasonSocialMappings": reason_social_mappings,
         "campaignDesgloseMappings": campaign_desglose_mappings,
+        "cardChargesByCode": card_charges_by_code,
         "reasonSocialRows": reason_social_rows,
     }
 

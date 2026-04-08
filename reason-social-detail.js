@@ -37,6 +37,13 @@ const clpFormatter = new Intl.NumberFormat("es-CL", {
   maximumFractionDigits: 0,
 });
 
+const usdFormatter = new Intl.NumberFormat("es-CL", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const monthFormatter = new Intl.DateTimeFormat("es-CL", {
   month: "long",
   year: "numeric",
@@ -57,6 +64,35 @@ function esc(text) {
 
 function formatCLP(value) {
   return clpFormatter.format(value || 0);
+}
+
+function toOptionalNumber(value) {
+  if (value === null || value === undefined) return null;
+  const text = normalizeText(value);
+  if (!text) return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function formatOptionalCLP(value) {
+  const num = toOptionalNumber(value);
+  if (num === null) return "-";
+  return formatCLP(num);
+}
+
+function formatUSD(value) {
+  const num = toOptionalNumber(value);
+  if (num === null) return "-";
+  return usdFormatter.format(num);
+}
+
+function formatDate(value) {
+  const raw = normalizeText(value);
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return raw || "-";
+  const [_, year, month, day] = m;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  return date.toLocaleDateString("es-CL", { timeZone: "UTC" });
 }
 
 function getExportFileBaseName() {
@@ -85,6 +121,12 @@ function buildXlsxBodyWithOutline(rows) {
       row.project,
       row.campaignName,
       row.referenceId,
+      formatDate(row.paymentDate),
+      row.paymentReference || "-",
+      row.chargeCode || "",
+      toOptionalNumber(row.chargeAmountOriginal),
+      toOptionalNumber(row.chargeAmountUsd),
+      row.chargeAmountValidation || "-",
       row.amount,
     ]);
     outlineRows.push({ level: 0 });
@@ -101,6 +143,12 @@ function buildXlsxBodyWithOutline(rows) {
         split.project,
         `Apertura ${splitIndex + 1}/${splits.length} - ${row.campaignName}`,
         row.referenceId,
+        formatDate(row.paymentDate),
+        row.paymentReference || "-",
+        row.chargeCode || "",
+        toOptionalNumber(row.chargeAmountOriginal),
+        toOptionalNumber(row.chargeAmountUsd),
+        row.chargeAmountValidation || "-",
         split.amount,
       ]);
       outlineRows.push({ level: 1, hidden: true });
@@ -126,22 +174,47 @@ function exportTableXlsx(rows) {
     "Proyecto",
     "Nombre de campaña",
     "ID transacción / N° factura",
+    "Fecha de pago",
+    "N° referencia",
+    "Código (Descripción del cobro)",
+    "Monto moneda origen",
+    "Monto US$",
+    "Validación monto",
     "Monto",
   ];
 
   const totalAmount = sortedRows.reduce((sum, row) => sum + row.amount, 0);
-  body.push(["-", "TOTAL", "-", "-", "-", "-", "-", totalAmount]);
+  body.push(["-", "TOTAL", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", totalAmount]);
   outlineRows.push({ level: 0 });
 
   const worksheet = window.XLSX.utils.aoa_to_sheet([headers, ...body]);
-  worksheet["!cols"] = [{ wch: 18 }, { wch: 30 }, { wch: 14 }, { wch: 20 }, { wch: 20 }, { wch: 40 }, { wch: 30 }, { wch: 16 }];
+  worksheet["!cols"] = [
+    { wch: 18 },
+    { wch: 30 },
+    { wch: 14 },
+    { wch: 20 },
+    { wch: 20 },
+    { wch: 40 },
+    { wch: 30 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 28 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 16 },
+  ];
   worksheet["!outline"] = { above: false, left: false };
   worksheet["!rows"] = [{}];
   outlineRows.forEach((meta) => {
     worksheet["!rows"].push(meta);
   });
   for (let rowIndex = 2; rowIndex <= body.length + 1; rowIndex += 1) {
-    const amountCell = worksheet[`H${rowIndex}`];
+    const originCell = worksheet[`K${rowIndex}`];
+    if (originCell && typeof originCell.v === "number") originCell.z = '"$"#,##0';
+    const usdCell = worksheet[`L${rowIndex}`];
+    if (usdCell && typeof usdCell.v === "number") usdCell.z = '"US$"#,##0.00';
+    const amountCell = worksheet[`N${rowIndex}`];
     if (amountCell) amountCell.z = '"$"#,##0';
   }
 
@@ -174,9 +247,15 @@ function exportTablePdf(rows) {
     row.project,
     row.campaignName,
     row.referenceId,
+    formatDate(row.paymentDate),
+    row.paymentReference || "-",
+    row.chargeCode || "-",
+    formatOptionalCLP(row.chargeAmountOriginal),
+    formatUSD(row.chargeAmountUsd),
+    row.chargeAmountValidation || "-",
     formatCLP(row.amount),
   ]);
-  body.push(["-", "TOTAL", "-", "-", "-", "-", "-", formatCLP(totalAmount)]);
+  body.push(["-", "TOTAL", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", formatCLP(totalAmount)]);
 
   doc.setFontSize(13);
   doc.text("Detalle por Razón Social", 40, 36);
@@ -194,13 +273,19 @@ function exportTablePdf(rows) {
         "Proyecto",
         "Nombre de campaña",
         "ID transacción / N° factura",
+        "Fecha de pago",
+        "N° referencia",
+        "Código (Descripción del cobro)",
+        "Monto moneda origen",
+        "Monto US$",
+        "Validación monto",
         "Monto",
       ],
     ],
     body,
     styles: { fontSize: 8, cellPadding: 5 },
     headStyles: { fillColor: [31, 31, 31] },
-    columnStyles: { 7: { halign: "right" } },
+    columnStyles: { 10: { halign: "right" }, 11: { halign: "right" }, 13: { halign: "right" } },
     didParseCell(hookData) {
       if (hookData.section === "body" && hookData.row.index === body.length - 1) {
         hookData.cell.styles.fontStyle = "bold";
@@ -268,6 +353,12 @@ function extractRows() {
       const referenceType =
         normalizeText(row.referenceType) || (platform === "Meta" ? "transactionId" : "invoiceNumber");
       const referenceId = normalizeText(row.referenceId || row.invoiceId);
+      const paymentDate = normalizeText(row.paymentDate || row.invoiceDate);
+      const paymentReference = normalizeText(row.paymentReference);
+      const chargeCode = normalizeText(row.chargeCode);
+      const chargeAmountOriginal = toOptionalNumber(row.chargeAmountOriginal);
+      const chargeAmountUsd = toOptionalNumber(row.chargeAmountUsd);
+      const chargeAmountValidation = normalizeText(row.chargeAmountValidation) || "Sin match";
       const splitAssignmentsRaw = Array.isArray(row.splitAssignments) ? row.splitAssignments : [];
       const splitAssignments =
         splitAssignmentsRaw.length > 0
@@ -303,6 +394,12 @@ function extractRows() {
         campaignName: normalizeText(row.campaignName) || "-",
         referenceType,
         referenceId: referenceId || "-",
+        paymentDate: paymentDate || "-",
+        paymentReference: paymentReference || "-",
+        chargeCode: chargeCode || "-",
+        chargeAmountOriginal,
+        chargeAmountUsd,
+        chargeAmountValidation,
         amount: Number(row.amount || 0),
         splitAssignments: normalizedSplitAssignments,
       };
@@ -346,6 +443,10 @@ function getFilteredRows() {
         row.project,
         row.campaignName,
         row.referenceId,
+        row.paymentDate,
+        row.paymentReference,
+        row.chargeCode,
+        row.chargeAmountValidation,
         row.brand,
       ]
         .join(" ")
@@ -370,7 +471,7 @@ function render(rows) {
   if (exportPdfBtn) exportPdfBtn.disabled = visibleRows.length === 0;
 
   if (!visibleRows.length) {
-    tableBody.innerHTML = '<tr><td colspan="8" class="empty">No hay filas para los filtros seleccionados.</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="14" class="empty">No hay filas para los filtros seleccionados.</td></tr>';
     return;
   }
 
@@ -396,6 +497,12 @@ function render(rows) {
           </div>
         </td>
         <td>${esc(row.referenceId)}</td>
+        <td>${esc(formatDate(row.paymentDate))}</td>
+        <td>${esc(row.paymentReference)}</td>
+        <td>${esc(row.chargeCode)}</td>
+        <td class="amount">${formatOptionalCLP(row.chargeAmountOriginal)}</td>
+        <td class="amount">${formatUSD(row.chargeAmountUsd)}</td>
+        <td>${esc(row.chargeAmountValidation)}</td>
         <td class="amount">${formatCLP(row.amount)}</td>
       </tr>`;
 
@@ -412,6 +519,12 @@ function render(rows) {
         <td>${esc(splitRow.project)}</td>
         <td><span class="rsd-split-label">Apertura ${splitIndex + 1}/${splitRows.length}</span> ${esc(row.campaignName)}</td>
         <td>${esc(row.referenceId)}</td>
+        <td>${esc(formatDate(row.paymentDate))}</td>
+        <td>${esc(row.paymentReference)}</td>
+        <td>${esc(row.chargeCode)}</td>
+        <td class="amount">${formatOptionalCLP(row.chargeAmountOriginal)}</td>
+        <td class="amount">${formatUSD(row.chargeAmountUsd)}</td>
+        <td>${esc(row.chargeAmountValidation)}</td>
         <td class="amount">${formatCLP(splitRow.amount)}</td>
       </tr>`
         )
