@@ -2019,6 +2019,77 @@ def build_reason_social_rows(
         for pos, row_idx in enumerate(row_indexes):
             rows[row_idx]["chargeTcAmount"] = allocated[pos]
 
+    # Ajuste de diferencias Google:
+    # si el total de la factura no coincide con la suma de filas asignadas,
+    # se descuenta/agrega la diferencia a la razón social con mayor inversión por marca.
+    brand_google_diffs: dict[str, int] = defaultdict(int)
+    for invoice in invoices:
+        if str(invoice.get("platform", "")).strip() != "Google Ads":
+            continue
+        invoice_id = str(invoice.get("id", "")).strip()
+        brand = str(invoice.get("brand", "")).strip()
+        if not invoice_id or not brand:
+            continue
+        invoice_total = int(invoice.get("totalAmount", 0) or 0)
+        mapped_total = sum(
+            int(row.get("amount", 0) or 0)
+            for row in rows
+            if str(row.get("platform", "")).strip() == "Google Ads" and str(row.get("invoiceId", "")).strip() == invoice_id
+        )
+        diff = invoice_total - mapped_total
+        if diff != 0:
+            brand_google_diffs[brand] += diff
+
+    google_brand_totals: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for row in rows:
+        if str(row.get("platform", "")).strip() != "Google Ads":
+            continue
+        brand = str(row.get("brand", "")).strip()
+        legal_entity = str(row.get("legalEntity", "")).strip()
+        amount = int(row.get("amount", 0) or 0)
+        if not brand or not legal_entity or legal_entity == "Sin asignar":
+            continue
+        google_brand_totals[brand][legal_entity] += amount
+
+    top_google_legal_entity_by_brand: dict[str, str] = {}
+    for brand, totals in google_brand_totals.items():
+        ordered = sorted(totals.items(), key=lambda item: (-item[1], item[0]))
+        if ordered:
+            top_google_legal_entity_by_brand[brand] = ordered[0][0]
+
+    for brand, diff in brand_google_diffs.items():
+        if diff == 0:
+            continue
+        target_legal_entity = top_google_legal_entity_by_brand.get(brand, "")
+        if not target_legal_entity:
+            continue
+
+        candidate_indexes = [
+            idx
+            for idx, row in enumerate(rows)
+            if str(row.get("platform", "")).strip() == "Google Ads"
+            and str(row.get("brand", "")).strip() == brand
+            and str(row.get("legalEntity", "")).strip() == target_legal_entity
+        ]
+        if not candidate_indexes:
+            continue
+
+        target_index = max(candidate_indexes, key=lambda idx: int(rows[idx].get("amount", 0) or 0))
+        rows[target_index]["amount"] = int(rows[target_index].get("amount", 0) or 0) + diff
+
+        split_assignments = rows[target_index].get("splitAssignments", [])
+        if isinstance(split_assignments, list) and split_assignments:
+            matching_splits = [
+                split
+                for split in split_assignments
+                if str(split.get("legalEntity", "")).strip() == target_legal_entity
+            ]
+            if matching_splits:
+                target_split = max(matching_splits, key=lambda split: int(split.get("amount", 0) or 0))
+            else:
+                target_split = split_assignments[0]
+            target_split["amount"] = int(target_split.get("amount", 0) or 0) + diff
+
     return sorted(
         rows,
         key=lambda item: (
