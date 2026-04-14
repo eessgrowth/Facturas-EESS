@@ -22,6 +22,7 @@ from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parent.parent
 PDF_DIR = ROOT / "pdfs"
+GOOGLE_INVOICES_DIR = ROOT / "Facturas Google"
 META_INVOICES_DIR = ROOT / "Facturas Meta"
 META_CARD_STATEMENTS_DIR = META_INVOICES_DIR / "Cartola TC"
 DATA_DIR = ROOT / "data"
@@ -957,15 +958,22 @@ def parse_meta_card_statement_charges(
 
 def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, Any]:
     filename = path.name
-    brand = (
-        "Almagro Inmobiliaria"
-        if "Almagro_Inmobiliaria" in filename
-        else "Almagro Propiedades"
-        if "Almagro_Propiedades" in filename
-        else "Socovesa"
-        if "Socovesa" in filename
-        else "Pilares"
-    )
+    brand_key_candidates: list[str] = [path.parent.name, path.parent.parent.name, filename]
+    brand = "Pilares"
+    for candidate in brand_key_candidates:
+        normalized = normalize_key(candidate)
+        if "almagropropiedades" in normalized:
+            brand = "Almagro Propiedades"
+            break
+        if "almagro" in normalized:
+            brand = "Almagro Inmobiliaria"
+            break
+        if "socovesa" in normalized:
+            brand = "Socovesa"
+            break
+        if "pilares" in normalized:
+            brand = "Pilares"
+            break
 
     text = extract_text_pypdf(path)
     lines = extract_layout_lines(path)
@@ -1102,11 +1110,16 @@ def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, 
         if item.get("description") and item.get("quantity") is not None and item.get("amount", 0) > 0
     ]
 
+    try:
+        document_file = path.relative_to(ROOT).as_posix()
+    except ValueError:
+        document_file = f"pdfs/{filename}"
+
     return {
         "id": invoice_number,
         "sourceFile": filename,
-        "pdfFile": f"pdfs/{filename}",
-        "documentFile": f"pdfs/{filename}",
+        "pdfFile": document_file,
+        "documentFile": document_file,
         "platform": "Google Ads",
         "brand": brand,
         "month": month_key(invoice_date_iso),
@@ -2111,7 +2124,12 @@ def main() -> None:
     reason_social_mappings: list[dict[str, Any]] = []
     campaign_desglose_mappings: list[dict[str, Any]] = []
     card_charges_by_code: dict[str, dict[str, Any]] = {}
-    google_files = sorted(PDF_DIR.glob("*GoogleAds.pdf"))
+    google_files_map: dict[str, Path] = {}
+    for file in sorted(GOOGLE_INVOICES_DIR.rglob("*.pdf")):
+        google_files_map[file.name.lower()] = file
+    for file in sorted(PDF_DIR.glob("*GoogleAds.pdf")):
+        google_files_map.setdefault(file.name.lower(), file)
+    google_files = sorted(google_files_map.values(), key=lambda p: p.as_posix().lower())
     meta_files = sorted(PDF_DIR.glob("*Meta*.pdf"))
 
     for file in google_files:
