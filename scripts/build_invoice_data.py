@@ -1712,7 +1712,10 @@ def build_reason_social_rows(
                 int(card_charge_match.get("amountOriginal", 0) or 0) if card_charge_match else None
             )
             charge_amount_usd = float(card_charge_match.get("amountUsd", 0.0) or 0.0) if card_charge_match else None
-            charge_amount_validation = "Pendiente" if charge_amount_original is not None else "Sin match"
+            if platform == "Meta":
+                charge_amount_validation = "Pendiente" if charge_amount_original is not None else "No aplica"
+            else:
+                charge_amount_validation = "Sin match"
 
             campaign_key = normalize_key(campaign_name)
             candidate_pool: list[dict[str, Any]] = []
@@ -1915,7 +1918,7 @@ def build_reason_social_rows(
                     "chargeCode": "",
                     "chargeAmountOriginal": None,
                     "chargeAmountUsd": None,
-                    "chargeAmountValidation": "Sin match",
+                    "chargeAmountValidation": "No aplica" if platform == "Meta" else "Sin match",
                     "chargeTcAmount": None,
                     "legalEntity": top_legal_entity,
                     "comuna": top_comuna,
@@ -1968,10 +1971,10 @@ def build_reason_social_rows(
             continue
         payment_reference = str(row.get("paymentReference", "")).strip().upper()
         if not payment_reference:
-            row["chargeAmountValidation"] = "Sin match"
+            row["chargeAmountValidation"] = "No aplica"
             continue
         if row.get("chargeAmountOriginal") is None:
-            row["chargeAmountValidation"] = "Sin match"
+            row["chargeAmountValidation"] = "No aplica"
             continue
 
         total_by_reference = meta_totals_by_reference.get(payment_reference, 0)
