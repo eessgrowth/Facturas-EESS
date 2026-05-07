@@ -69,6 +69,7 @@ DATE_DMY_RE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 DATE_DMONY_RE = re.compile(r"^(\d{1,2})\s+([a-zA-Z]{3})\s+(\d{4})$")
 META_RECEIPT_DATE_RE = re.compile(r"(\d{1,2})\s+([a-zA-ZÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±\.]+)\s+(\d{4})", re.IGNORECASE)
 FACEBK_CODE_RE = re.compile(r"FACEBK\s*\*([A-Z0-9]{8,12})", re.IGNORECASE)
+STAR_CHARGE_CODE_RE = re.compile(r"\*([A-Z0-9]{8,12})", re.IGNORECASE)
 DECIMAL_COMMA_RE = re.compile(r"\d{1,3}(?:\.\d{3})*,\d{2}")
 
 DESGLOSE_BRAND_PREFIXES = [
@@ -89,6 +90,19 @@ class ParseWarning:
 def normalize_key(value: str) -> str:
     plain = "".join(ch for ch in unicodedata.normalize("NFKD", str(value).lower()) if not unicodedata.combining(ch))
     return re.sub(r"[^a-z0-9]+", "", plain)
+
+
+CANONICAL_ENCINAS_LEGAL_ENTITY = "INMOBILIARIA ENCINAS DE PE\u00d1ALOLEN"
+
+
+def normalize_legal_entity_name(value: str) -> str:
+    raw = str(value or "").strip()
+    key = normalize_key(raw)
+    if key == "inmobiliariaencinasdepenalolen" or (
+        "inmobiliariaencinasdepe" in key and key.endswith("alolen")
+    ):
+        return CANONICAL_ENCINAS_LEGAL_ENTITY
+    return raw
 
 
 PROJECT_LEGAL_ENTITY_OVERRIDES = {
@@ -133,6 +147,9 @@ PROJECT_LEGAL_ENTITY_OVERRIDES = {
     normalize_key("Reserva Magallanes"): "Socovesa Sur S.A",
     normalize_key("Terraza Mirador"): "Socovesa Sur S.A",
 }
+
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Las Pataguas")] = CANONICAL_ENCINAS_LEGAL_ENTITY
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Los Coihues")] = CANONICAL_ENCINAS_LEGAL_ENTITY
 
 PROJECT_PEP_CODES = {
     normalize_key("Insigne"): "I-ALM-2157",
@@ -182,8 +199,8 @@ PROJECT_PEP_CODES = {
 def override_legal_entity_by_project(project: str, fallback_legal_entity: str) -> str:
     project_key = normalize_key(project)
     if not project_key:
-        return fallback_legal_entity
-    return PROJECT_LEGAL_ENTITY_OVERRIDES.get(project_key, fallback_legal_entity)
+        return normalize_legal_entity_name(fallback_legal_entity)
+    return normalize_legal_entity_name(PROJECT_LEGAL_ENTITY_OVERRIDES.get(project_key, fallback_legal_entity))
 
 
 def pep_code_by_project(project: str) -> str:
@@ -1044,21 +1061,50 @@ def parse_meta_card_statement_charges(
         if not charge_code:
             return
         existing = charges_by_code.get(charge_code)
-        if existing and (
-            existing.get("amountOriginal") != entry.get("amountOriginal")
-            or str(existing.get("amountUsdRaw", "")) != str(entry.get("amountUsdRaw", ""))
-        ):
-            warnings.append(
-                ParseWarning(
-                    source=source_name,
-                    message=(
-                        f"Duplicate FACEBK code with different amounts: {charge_code} "
-                        f"({existing.get('amountOriginalRaw')}/{existing.get('amountUsdRaw')} vs "
-                        f"{entry.get('amountOriginalRaw')}/{entry.get('amountUsdRaw')})."
-                    ),
+        if existing:
+            existing_origin = int(existing.get("amountOriginal", 0) or 0)
+            incoming_origin = int(entry.get("amountOriginal", 0) or 0)
+            existing_usd = float(existing.get("amountUsd", 0.0) or 0.0)
+            incoming_usd = float(entry.get("amountUsd", 0.0) or 0.0)
+
+            if existing_origin != incoming_origin or abs(existing_usd - incoming_usd) > 0.01:
+                warnings.append(
+                    ParseWarning(
+                        source=source_name,
+                        message=(
+                            f"Duplicate FACEBK code with different amounts: {charge_code} "
+                            f"({existing_origin}/{existing_usd:.2f} vs {incoming_origin}/{incoming_usd:.2f})."
+                        ),
+                    )
                 )
-            )
+
+            merged_sources = []
+            for source in [existing.get("sourceFile", ""), *existing.get("sourceFiles", []), entry.get("sourceFile", "")]:
+                source_str = str(source).strip()
+                if source_str and source_str not in merged_sources:
+                    merged_sources.append(source_str)
+            entry["sourceFiles"] = merged_sources
+
+        if "sourceFiles" not in entry:
+            source_str = str(entry.get("sourceFile", "")).strip()
+            entry["sourceFiles"] = [source_str] if source_str else []
+
         charges_by_code[charge_code] = entry
+
+    def extract_charge_code(raw_line: str) -> str:
+        line = str(raw_line or "")
+        direct = FACEBK_CODE_RE.search(line.upper())
+        if direct:
+            return direct.group(1).upper()
+
+        # OCR on cartolas can drop letters from "FACEBK"; accept STAR code when
+        # the line still looks like a Meta/Facebook ads charge context.
+        line_upper = line.upper()
+        if any(token in line_upper for token in ("FB.ME/ADS", "FBME/ADS", "FACE", "META", "ADS")):
+            star_match = STAR_CHARGE_CODE_RE.search(line_upper)
+            if star_match:
+                return star_match.group(1).upper()
+        return ""
 
     def parse_cartola_xls(file_path: Path) -> tuple[int, int]:
         if xlrd is None:
@@ -1078,13 +1124,10 @@ def parse_meta_card_statement_charges(
         reconciled_rows = 0
         for row_idx in range(sheet.nrows):
             desc_raw = str(sheet.cell_value(row_idx, 2) or "").strip()
-            if "FACEBK" not in desc_raw.upper():
-                continue
-            code_match = FACEBK_CODE_RE.search(desc_raw.upper())
-            if not code_match:
+            charge_code_raw = extract_charge_code(desc_raw)
+            if not charge_code_raw:
                 continue
 
-            charge_code_raw = code_match.group(1).upper()
             charge_code, reconciled_from = resolve_to_known_reference(charge_code_raw)
             if reconciled_from:
                 reconciled_rows += 1
@@ -1124,15 +1167,15 @@ def parse_meta_card_statement_charges(
         parsed_rows = 0
         for idx, raw_line in enumerate(lines):
             line = " ".join(raw_line.split())
-            code_match = FACEBK_CODE_RE.search(line.upper())
-            if not code_match:
+            charge_code_raw = extract_charge_code(line)
+            if not charge_code_raw:
                 continue
 
-            charge_code_raw = code_match.group(1).upper()
             charge_code, reconciled_from = resolve_to_known_reference(charge_code_raw)
             if reconciled_from:
                 reconciled_codes += 1
-            tail = line[code_match.end() :]
+            code_match = re.search(rf"\*{re.escape(charge_code_raw)}", line, re.IGNORECASE)
+            tail = line[code_match.end() :] if code_match else line
             amount_tokens = DECIMAL_COMMA_RE.findall(tail)
             if len(amount_tokens) < 2:
                 amount_tokens = DECIMAL_COMMA_RE.findall(line)
