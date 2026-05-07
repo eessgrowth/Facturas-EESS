@@ -577,6 +577,16 @@ function googleDetailsTable(invoice) {
 }
 
 function metaDetailsTable(invoice) {
+  const campaignRows = (invoice.campaigns || [])
+    .map(
+      (row) => `
+      <tr>
+        <td>${esc(row.name)}</td>
+        <td class="amount">${formatCLP(row.amount)}</td>
+      </tr>`
+    )
+    .join("");
+
   const rows = invoice.details
     .map(
       (row) => `
@@ -590,8 +600,28 @@ function metaDetailsTable(invoice) {
     )
     .join("");
 
+  const campaignBlock = campaignRows
+    ? `
+    <details class="details" open>
+      <summary>Detalle por campaña (${invoice.campaigns.length} líneas)</summary>
+      <div>
+        <table>
+          <thead>
+            <tr>
+              <th>Campaña</th>
+              <th class="amount">Monto</th>
+            </tr>
+          </thead>
+          <tbody>${campaignRows}</tbody>
+        </table>
+      </div>
+    </details>
+  `
+    : "";
+
   return `
-    <details class="details">
+    ${campaignBlock}
+    <details class="details" ${campaignRows ? "" : "open"}>
       <summary>Detalle de transacciones (${invoice.details.length} líneas)</summary>
       <div>
         <table>
