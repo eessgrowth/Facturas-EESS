@@ -150,6 +150,8 @@ PROJECT_LEGAL_ENTITY_OVERRIDES = {
 
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Las Pataguas")] = CANONICAL_ENCINAS_LEGAL_ENTITY
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Los Coihues")] = CANONICAL_ENCINAS_LEGAL_ENTITY
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Almagro Terra")] = "Almagro S.A"
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Franklin")] = "Arcilla Roja"
 
 PROJECT_PEP_CODES = {
     normalize_key("Insigne"): "I-ALM-2157",
