@@ -152,6 +152,10 @@ PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Las Pataguas")] = CANONICAL_ENCINA
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Los Coihues")] = CANONICAL_ENCINAS_LEGAL_ENTITY
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Almagro Terra")] = "Almagro S.A"
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Franklin")] = "Arcilla Roja"
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Valle del Mar")] = "Almagro S.A"
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Signature")] = "Almagro S.A"
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Agust\u00edn del Castillo")] = "Almagro SA"
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Plaza Mirador")] = "INSOCO"
 
 PROJECT_PEP_CODES = {
     normalize_key("Insigne"): "I-ALM-2157",
@@ -197,6 +201,19 @@ PROJECT_PEP_CODES = {
     normalize_key("Almagro Terra"): "I-ALM-2360",
 }
 
+MANUAL_CAMPAIGN_PROJECT_OVERRIDES = {
+    normalize_key("ValleDelMar"): ("Antofagasta", "Valle del Mar"),
+    normalize_key("Signature"): ("Santiago", "Signature"),
+    normalize_key("Carrera_IV"): ("Santiago", "Carrera 4"),
+    normalize_key("Carrera IV"): ("Santiago", "Carrera 4"),
+    normalize_key("SanEugenio"): ("Santiago", "San Eugenio 2"),
+    normalize_key("VistaNielol"): ("Temuco", "N3"),
+    normalize_key("Temuco N3"): ("Temuco", "N3"),
+    normalize_key("Inversionistas"): ("Santiago", "Insigne"),
+    normalize_key("Vitacura"): ("Vitacura", "Agust\u00edn del Castillo"),
+    normalize_key("Plaza Mirador"): ("La Florida", "Plaza Mirador"),
+}
+
 
 def override_legal_entity_by_project(project: str, fallback_legal_entity: str) -> str:
     project_key = normalize_key(project)
@@ -210,6 +227,15 @@ def pep_code_by_project(project: str) -> str:
     if not project_key:
         return ""
     return PROJECT_PEP_CODES.get(project_key, "")
+
+
+def manual_assignment_by_campaign(campaign_name: str) -> tuple[str, str, str] | None:
+    campaign_key = normalize_key(campaign_name)
+    for token, (comuna, project) in MANUAL_CAMPAIGN_PROJECT_OVERRIDES.items():
+        if token in campaign_key:
+            legal_entity = override_legal_entity_by_project(project, "Sin asignar")
+            return legal_entity, comuna, project
+    return None
 
 
 def normalize_brand_group(value: str) -> str:
@@ -594,7 +620,7 @@ def parse_meta_receipt_campaigns(lines: list[str]) -> list[dict[str, Any]]:
 
     while idx < len(lines):
         line = lines[idx]
-        if line.startswith("CampaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±as"):
+        if normalize_key(line) == "campanas":
             in_campaign_block = True
             idx += 1
             continue
@@ -1322,7 +1348,7 @@ def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, 
     details: list[dict[str, Any]] = []
     in_table = False
     for line in lines:
-        if line.startswith("DescripciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n"):
+        if normalize_key(line).startswith("descripcion"):
             in_table = True
             continue
         if not in_table:
@@ -1332,7 +1358,8 @@ def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, 
             continue
         if line.startswith("Si tiene alguna pregunta"):
             continue
-        if line.startswith("Factura") or line.startswith("NÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºmero de factura:"):
+        normalized_line = normalize_key(line)
+        if line.startswith("Factura") or normalized_line.startswith("numerodefactura"):
             continue
 
         invalid_m = re.match(r"^(Actividad no vÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡lida\.\.\.)\s+(-?[\d,]+)$", line)
@@ -2109,6 +2136,11 @@ def build_reason_social_rows(
                 comuna = str(sorted_candidates[0].get("comuna", "")).strip() or "Sin asignar"
                 project = str(sorted_candidates[0].get("project", "")).strip() or "Sin asignar"
                 mapping_brand = sorted_candidates[0]["brand"]
+            else:
+                manual_assignment = manual_assignment_by_campaign(campaign_name)
+                if manual_assignment:
+                    legal_entity, comuna, project = manual_assignment
+                    mapping_brand = "Manual"
 
             desglose_pool: list[dict[str, Any]] = []
             for alias in brand_group_aliases(brand_group):
