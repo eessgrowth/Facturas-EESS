@@ -1,0 +1,15 @@
+Validacion global cartolas Meta vs facturas/proyectos/fechas/referencias/PEP
+
+Cartola marzo-abril 2026
+Referencias cartola cruzadas: 91
+Filas campana/proyecto con cartola: 5071
+Descuadres de monto por referencia: 0
+Campos obligatorios faltantes: 0
+
+Cartola mayo-junio 2026
+Referencias cartola cruzadas: 86
+Codigos cartola sin factura Meta: 0
+Facturas Meta sin cartola: 18
+Filas campana/proyecto con cartola: 5138
+Descuadres de monto por referencia: 0
+Campos obligatorios faltantes: 0

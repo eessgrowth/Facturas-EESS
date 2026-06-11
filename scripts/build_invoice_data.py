@@ -201,6 +201,14 @@ PROJECT_PEP_CODES = {
     normalize_key("Almagro Terra"): "I-ALM-2360",
 }
 
+PROJECT_PEP_CODES[normalize_key("Edificio \u00d1uble")] = "I-SVS-2173"
+PROJECT_PEP_CODES[normalize_key("Vicu\u00f1a Mackenna 7244")] = "I-SVS-2131"
+PROJECT_PEP_CODES[normalize_key("Garc\u00eda Reyes")] = "I-SUR-2283"
+PROJECT_PEP_CODES[normalize_key("Edificio V\u00e9rtice")] = "I-SUR-2297"
+PROJECT_PEP_CODES[normalize_key("Plaza Mirador")] = "I-STG-2391"
+PROJECT_PEP_CODES[normalize_key("Valle del Mar")] = "I-ALM-1453"
+PROJECT_PEP_CODES[normalize_key("Signature")] = "I-ALM-2354"
+
 MANUAL_CAMPAIGN_PROJECT_OVERRIDES = {
     normalize_key("ValleDelMar"): ("Antofagasta", "Valle del Mar"),
     normalize_key("Signature"): ("Santiago", "Signature"),

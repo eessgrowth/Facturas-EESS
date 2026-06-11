@@ -1,0 +1,40 @@
+Cruce Meta mayo/junio 2026 vs cartola TC MovFacturadosInternacionales_94840000-6_9-6-2026
+Facturas Meta parseadas: 115
+Referencias Meta unicas: 104
+Cargos FACEBK cartola: 86
+Filas reporte: 104
+
+Almagro Inmobiliaria
+  Coincide: 38
+  Sin cartola: 7
+  monto coincidente CLP: 22800780
+Pilares
+  Coincide: 15
+  Sin cartola: 4
+  monto coincidente CLP: 8573061
+Socovesa
+  Coincide: 33
+  Sin cartola: 7
+  monto coincidente CLP: 19467509
+
+Desglose por mes y marca
+2026-05
+  Almagro Inmobiliaria
+    Coincide: 32 | monto CLP: 19200780
+    Sin cartola: 6 | monto CLP: 3600000
+  Pilares
+    Coincide: 12 | monto CLP: 7200000
+    Sin cartola: 3 | monto CLP: 1202158
+  Socovesa
+    Coincide: 28 | monto CLP: 16790944
+    Sin cartola: 6 | monto CLP: 3596748
+2026-06
+  Almagro Inmobiliaria
+    Coincide: 6 | monto CLP: 3600000
+    Sin cartola: 1 | monto CLP: 600000
+  Pilares
+    Coincide: 3 | monto CLP: 1373061
+    Sin cartola: 1 | monto CLP: 600000
+  Socovesa
+    Coincide: 5 | monto CLP: 2676565
+    Sin cartola: 1 | monto CLP: 600000
