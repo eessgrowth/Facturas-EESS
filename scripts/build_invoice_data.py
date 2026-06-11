@@ -80,6 +80,27 @@ DESGLOSE_BRAND_PREFIXES = [
     ("Pilares", "pilares"),
 ]
 
+GCLOUD_SPLIT_ENTITIES = [
+    {
+        "legalEntity": "Almagro S.A",
+        "comuna": "GCloud",
+        "project": "GCloud",
+        "pepCode": "",
+    },
+    {
+        "legalEntity": "Pilares",
+        "comuna": "GCloud",
+        "project": "GCloud",
+        "pepCode": "",
+    },
+    {
+        "legalEntity": "INSOCO",
+        "comuna": "GCloud",
+        "project": "GCloud",
+        "pepCode": "",
+    },
+]
+
 
 @dataclass
 class ParseWarning:
@@ -1013,6 +1034,48 @@ def extract_card_statement_text(path: Path, warnings: list[ParseWarning]) -> str
     return text
 
 
+def parse_date_dmy_to_iso(value: str) -> str:
+    match = DATE_DMY_RE.match(str(value).strip())
+    if not match:
+        return ""
+    day, month, year = match.groups()
+    return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+
+
+def parse_google_cloud_card_charges(root_dir: Path, warnings: list[ParseWarning]) -> list[dict[str, Any]]:
+    if not root_dir.exists() or xlrd is None:
+        return []
+
+    charges: list[dict[str, Any]] = []
+    for xls_file in sorted(root_dir.glob("*.xls")):
+        try:
+            workbook = xlrd.open_workbook(str(xls_file))
+            sheet = workbook.sheet_by_index(0)
+        except Exception as exc:
+            warnings.append(ParseWarning(source=xls_file.name, message=f"Could not read .xls cartola: {exc}"))
+            continue
+
+        for row_idx in range(sheet.nrows):
+            description = str(sheet.cell_value(row_idx, 2) or "").strip()
+            if "google cloud" not in description.lower():
+                continue
+            amount_origin = clp_to_int(str(sheet.cell_value(row_idx, 5) or "").strip())
+            if amount_origin <= 0:
+                continue
+            charges.append(
+                {
+                    "statementReference": str(sheet.cell_value(row_idx, 0) or "").strip(),
+                    "cartolaDate": parse_date_dmy_to_iso(str(sheet.cell_value(row_idx, 1) or "").strip()),
+                    "cartolaDateRaw": str(sheet.cell_value(row_idx, 1) or "").strip(),
+                    "descriptionCharge": description,
+                    "amountOriginal": amount_origin,
+                    "amountUsd": decimal_comma_to_float(str(sheet.cell_value(row_idx, 8) or "").strip()),
+                    "sourceFile": str(xls_file.relative_to(ROOT)),
+                }
+            )
+    return charges
+
+
 def parse_meta_card_statement_charges(
     root_dir: Path, warnings: list[ParseWarning], known_references: set[str] | None = None
 ) -> dict[str, dict[str, Any]]:
@@ -1272,8 +1335,13 @@ def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, 
     filename = path.name
     brand_key_candidates: list[str] = [path.parent.name, path.parent.parent.name, filename]
     brand = "Pilares"
+    is_gcloud = False
     for candidate in brand_key_candidates:
         normalized = normalize_key(candidate)
+        if "gcloud" in normalized or "googlecloud" in normalized:
+            brand = "GCloud"
+            is_gcloud = True
+            break
         if "almagropropiedades" in normalized:
             brand = "Almagro Propiedades"
             break
@@ -1289,6 +1357,9 @@ def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, 
 
     text = extract_text_pypdf(path)
     lines = extract_layout_lines(path)
+    if "google cloud" in text.lower():
+        brand = "GCloud"
+        is_gcloud = True
 
     invoice_number_m = re.search(r"NÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºmero de factura:\s*(\d+)", text)
     invoice_number = invoice_number_m.group(1) if invoice_number_m else filename.split("_")[0]
@@ -1422,6 +1493,18 @@ def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, 
         for item in details
         if item.get("description") and item.get("quantity") is not None and item.get("amount", 0) > 0
     ]
+    if is_gcloud and not campaigns and total_amount > 0:
+        campaigns = [{"name": "Google Cloud", "amount": total_amount}]
+
+    gcloud_charge = None
+    if is_gcloud and total_amount > 0:
+        for charge in parse_google_cloud_card_charges(META_CARD_STATEMENTS_DIR, warnings):
+            if int(charge.get("amountOriginal", 0) or 0) == total_amount:
+                gcloud_charge = charge
+                break
+
+    if gcloud_charge and gcloud_charge.get("cartolaDate"):
+        invoice_date_iso = str(gcloud_charge.get("cartolaDate", ""))
 
     try:
         document_file = path.relative_to(ROOT).as_posix()
@@ -1433,7 +1516,7 @@ def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, 
         "sourceFile": filename,
         "pdfFile": document_file,
         "documentFile": document_file,
-        "platform": "Google Ads",
+        "platform": "Google Cloud" if is_gcloud else "Google Ads",
         "brand": brand,
         "month": month_key(invoice_date_iso),
         "invoiceDate": invoice_date_iso,
@@ -1447,6 +1530,7 @@ def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, 
         "summaryBreakdown": summary_items,
         "details": details,
         "campaigns": campaigns,
+        "cardCharge": gcloud_charge or {},
         "notes": [],
     }
 
@@ -2049,10 +2133,62 @@ def build_reason_social_rows(
     rows: list[dict[str, Any]] = []
     for invoice in invoices:
         platform = str(invoice.get("platform", "")).strip()
-        if platform not in {"Meta", "Google Ads"}:
+        if platform not in {"Meta", "Google Ads", "Google Cloud"}:
             continue
 
         brand = str(invoice.get("brand", "")).strip()
+        if platform == "Google Cloud":
+            total_amount = int(invoice.get("totalAmount", 0) or 0)
+            if total_amount <= 0:
+                continue
+            split_amounts = split_amount_evenly(total_amount, len(GCLOUD_SPLIT_ENTITIES))
+            card_charge = invoice.get("cardCharge", {}) if isinstance(invoice.get("cardCharge"), dict) else {}
+            payment_date = str(card_charge.get("cartolaDate", "")).strip() or str(invoice.get("invoiceDate", "")).strip()
+            reference_id = str(card_charge.get("statementReference", "")).strip() or str(invoice.get("id", "")).strip()
+            for idx, assignment in enumerate(GCLOUD_SPLIT_ENTITIES):
+                amount = split_amounts[idx]
+                legal_entity = str(assignment.get("legalEntity", "")).strip()
+                comuna = str(assignment.get("comuna", "")).strip()
+                project = str(assignment.get("project", "")).strip()
+                pep_code = str(assignment.get("pepCode", "")).strip()
+                rows.append(
+                    {
+                        "invoiceId": invoice.get("id", ""),
+                        "invoiceDate": invoice.get("invoiceDate", ""),
+                        "month": month_key(payment_date),
+                        "platform": platform,
+                        "brand": brand,
+                        "campaignName": "Google Cloud",
+                        "amount": amount,
+                        "paymentDate": payment_date,
+                        "paymentReference": str(card_charge.get("descriptionCharge", "")).strip(),
+                        "chargeCode": str(card_charge.get("descriptionCharge", "")).strip(),
+                        "chargeAmountOriginal": int(card_charge.get("amountOriginal", 0) or 0) if card_charge else None,
+                        "chargeAmountUsd": float(card_charge.get("amountUsd", 0.0) or 0.0) if card_charge else None,
+                        "chargeAmountValidation": "Coincide" if card_charge else "No aplica",
+                        "chargeTcAmount": amount if card_charge else None,
+                        "legalEntity": legal_entity,
+                        "comuna": comuna,
+                        "project": project,
+                        "pepCode": pep_code,
+                        "referenceId": reference_id,
+                        "referenceType": "cartolaReference" if card_charge else "invoiceNumber",
+                        "mappingBrand": "GCloud",
+                        "splitAssignments": [
+                            {
+                                "legalEntity": legal_entity,
+                                "comuna": comuna,
+                                "project": project,
+                                "pepCode": pep_code,
+                                "amount": amount,
+                            }
+                        ],
+                        "splitCount": 1,
+                        "matched": True,
+                    }
+                )
+            continue
+
         brand_group = normalize_brand_group(brand)
         campaign_lines = extract_campaign_lines(invoice, platform)
         reference_type = campaign_reference_type(platform)

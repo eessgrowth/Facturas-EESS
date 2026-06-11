@@ -1,0 +1,14 @@
+Validacion GCloud cartola junio 2026
+Criterio: usa fecha de cartola como fecha principal.
+Factura: Facturas Google/GCloud/mayo_2026/5597019361.pdf
+Cartola: Facturas Meta/Cartola TC/MovFacturadosInternacionales_94840000-6_9-6-2026.xls
+Referencia cartola: 0206 24204296152002624034211
+Descripcion cartola: Google CLOUD GN9CVZ
+Fecha cartola: 2026-06-01
+Monto cartola CLP: 51035
+Filas razon social: 3
+Monto asignado CLP: 51035
+
+Almagro S.A | 17012
+INSOCO | 17011
+Pilares | 17012
