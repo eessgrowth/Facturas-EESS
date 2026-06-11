@@ -1,4 +1,4 @@
 month,platform,brand,paymentDate,referenceId,paymentReference,legalEntity,comuna,project,pepCode,amount,chargeAmountOriginal,chargeAmountUsd,chargeAmountValidation
-2026-06,Google Cloud,GCloud,2026-06-01,0206 24204296152002624034211,Google CLOUD GN9CVZ,Almagro S.A,GCloud,GCloud,,17012,51035,58.77,Coincide
-2026-06,Google Cloud,GCloud,2026-06-01,0206 24204296152002624034211,Google CLOUD GN9CVZ,INSOCO,GCloud,GCloud,,17011,51035,58.77,Coincide
-2026-06,Google Cloud,GCloud,2026-06-01,0206 24204296152002624034211,Google CLOUD GN9CVZ,Pilares,GCloud,GCloud,,17012,51035,58.77,Coincide
+2026-06,Google Ads,GCloud,2026-06-01,0206 24204296152002624034211,Google CLOUD GN9CVZ,Almagro S.A,GCloud,GCloud,,17012,51035,58.77,Coincide
+2026-06,Google Ads,GCloud,2026-06-01,0206 24204296152002624034211,Google CLOUD GN9CVZ,INSOCO,GCloud,GCloud,,17011,51035,58.77,Coincide
+2026-06,Google Ads,GCloud,2026-06-01,0206 24204296152002624034211,Google CLOUD GN9CVZ,Pilares,GCloud,GCloud,,17012,51035,58.77,Coincide

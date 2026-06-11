@@ -1,4 +1,4 @@
-Validacion GCloud cartola junio 2026
+Validacion GCloud como Google Ads cartola junio 2026
 Criterio: usa fecha de cartola como fecha principal.
 Factura: Facturas Google/GCloud/mayo_2026/5597019361.pdf
 Cartola: Facturas Meta/Cartola TC/MovFacturadosInternacionales_94840000-6_9-6-2026.xls
