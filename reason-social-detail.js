@@ -145,7 +145,7 @@ function getExportFileBaseName() {
 }
 
 function toExportRows(rows) {
-  return [...rows].sort((a, b) => b.amount - a.amount);
+  return [...rows].sort((a, b) => b.reportAmount - a.reportAmount);
 }
 
 function buildXlsxBodyWithOutline(rows) {
@@ -171,7 +171,7 @@ function buildXlsxBodyWithOutline(rows) {
       toOptionalNumber(row.chargeAmountOriginal),
       toOptionalNumber(row.chargeAmountUsd),
       row.chargeAmountValidation || "-",
-      row.amount,
+      row.reportAmount,
     ]);
     outlineRows.push({ level: 0 });
 
@@ -235,7 +235,7 @@ function exportTableXlsx(rows) {
     "Monto",
   ];
 
-  const totalAmount = sortedRows.reduce((sum, row) => sum + row.amount, 0);
+  const totalAmount = sortedRows.reduce((sum, row) => sum + row.reportAmount, 0);
   const totalChargeTc = sortedRows.reduce((sum, row) => sum + (toOptionalNumber(row.chargeTcAmount) || 0), 0);
   const { totalOrigin, totalUsd } = getUniqueCardChargeTotals(sortedRows);
   body.push([
@@ -313,7 +313,7 @@ function exportTablePdf(rows) {
   }
 
   const sortedRows = toExportRows(rows);
-  const totalAmount = sortedRows.reduce((sum, row) => sum + row.amount, 0);
+  const totalAmount = sortedRows.reduce((sum, row) => sum + row.reportAmount, 0);
   const totalChargeTc = sortedRows.reduce((sum, row) => sum + (toOptionalNumber(row.chargeTcAmount) || 0), 0);
   const { totalOrigin, totalUsd } = getUniqueCardChargeTotals(sortedRows);
   const body = sortedRows.map((row) => [
@@ -332,7 +332,7 @@ function exportTablePdf(rows) {
     formatOptionalCLP(row.chargeAmountOriginal),
     formatUSD(row.chargeAmountUsd),
     row.chargeAmountValidation || "-",
-    formatCLP(row.amount),
+    formatCLP(row.reportAmount),
   ]);
   body.push([
     "-",
@@ -459,6 +459,8 @@ function extractRows() {
       const chargeAmountUsd = toOptionalNumber(row.chargeAmountUsd);
       const chargeAmountValidation = normalizeText(row.chargeAmountValidation) || "Sin match";
       const pepCode = normalizeText(row.pepCode);
+      const amount = Number(row.amount || 0);
+      const reportAmount = platform === "Meta" ? (chargeTcAmount === null ? 0 : chargeTcAmount) : amount;
       const splitAssignmentsRaw = Array.isArray(row.splitAssignments) ? row.splitAssignments : [];
       const splitAssignments =
         splitAssignmentsRaw.length > 0
@@ -480,7 +482,7 @@ function extractRows() {
                 comuna: normalizeText(row.comuna) || "Sin asignar",
                 project: normalizeText(row.project) || "Sin asignar",
                 pepCode: pepCode || "",
-                amount: Number(row.amount || 0),
+                amount,
               },
             ];
 
@@ -504,7 +506,8 @@ function extractRows() {
         chargeAmountOriginal,
         chargeAmountUsd,
         chargeAmountValidation,
-        amount: Number(row.amount || 0),
+        amount,
+        reportAmount,
         splitAssignments: normalizedSplitAssignments,
       };
     })
@@ -566,7 +569,7 @@ function getFilteredRows() {
 function render(rows) {
   currentFilteredRows = toExportRows(rows);
   const visibleRows = currentFilteredRows;
-  const total = visibleRows.reduce((sum, row) => sum + row.amount, 0);
+  const total = visibleRows.reduce((sum, row) => sum + row.reportAmount, 0);
   const totalChargeTc = visibleRows.reduce((sum, row) => sum + (toOptionalNumber(row.chargeTcAmount) || 0), 0);
   const { totalOrigin, totalUsd } = getUniqueCardChargeTotals(visibleRows);
   const uniqueCampaigns = new Set(visibleRows.map((row) => row.campaignName).filter(Boolean)).size;
@@ -617,7 +620,7 @@ function render(rows) {
         <td class="amount">${formatOptionalCLP(row.chargeAmountOriginal)}</td>
         <td class="amount">${formatUSD(row.chargeAmountUsd)}</td>
         <td>${esc(row.chargeAmountValidation)}</td>
-        <td class="amount">${formatCLP(row.amount)}</td>
+        <td class="amount">${formatCLP(row.reportAmount)}</td>
       </tr>`;
 
       if (!isExpanded) return mainRow;

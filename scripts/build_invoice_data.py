@@ -1243,6 +1243,8 @@ def parse_meta_card_statement_charges(
                 "descriptionCharge": f"FACEBK *{charge_code}",
                 "sourceCodeRaw": charge_code_raw,
                 "reconciledFromRawCode": reconciled_from,
+                "cartolaDate": parse_date_dmy_to_iso(str(sheet.cell_value(row_idx, 1) or "").strip()),
+                "cartolaDateRaw": str(sheet.cell_value(row_idx, 1) or "").strip(),
                 "amountOriginal": amount_origin,
                 "amountOriginalRaw": amount_origin_raw,
                 "amountUsd": amount_usd,
@@ -2204,6 +2206,7 @@ def build_reason_social_rows(
 
             card_charge_match = card_charges_by_code.get(payment_reference) if payment_reference else None
             charge_code = str(card_charge_match.get("chargeCode", "")).strip() if card_charge_match else ""
+            cartola_date = str(card_charge_match.get("cartolaDate", "")).strip() if card_charge_match else ""
             charge_amount_original = (
                 int(card_charge_match.get("amountOriginal", 0) or 0) if card_charge_match else None
             )
@@ -2337,12 +2340,12 @@ def build_reason_social_rows(
                 {
                     "invoiceId": invoice.get("id", ""),
                     "invoiceDate": invoice.get("invoiceDate", ""),
-                    "month": invoice.get("month", ""),
+                    "month": month_key(cartola_date) if cartola_date else invoice.get("month", ""),
                     "platform": platform,
                     "brand": brand,
                     "campaignName": campaign_name,
                     "amount": amount,
-                    "paymentDate": payment_date,
+                    "paymentDate": cartola_date or payment_date,
                     "paymentReference": payment_reference,
                     "chargeCode": charge_code,
                     "chargeAmountOriginal": charge_amount_original,
