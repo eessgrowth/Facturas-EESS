@@ -241,6 +241,8 @@ MANUAL_CAMPAIGN_PROJECT_OVERRIDES = {
     normalize_key("Inversionistas"): ("Santiago", "Insigne"),
     normalize_key("Vitacura"): ("Vitacura", "Agust\u00edn del Castillo"),
     normalize_key("Plaza Mirador"): ("La Florida", "Plaza Mirador"),
+    normalize_key("FB_WA_Pilares_Advantage_Proyectos"): ("AON", "Guillermo Mann"),
+    normalize_key("FB_WA_SantiagoSubsidio_LasPataguas"): ("Lampa", "Las Pataguas"),
 }
 
 
