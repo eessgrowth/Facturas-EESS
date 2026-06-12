@@ -1,28 +1,28 @@
-Validacion cartola junio 2026 por fecha de cartola
+Validacion cartola junio 2026 por fecha principal Meta
+Criterio fecha principal Meta: si existe fecha de cartola, usa cartolaDate; si no existe, usa fecha de factura/pago Meta.
 Filas campana/proyecto: 863
 Referencias cartola junio: 15
 Descuadres de monto por referencia: 0
 Campos obligatorios faltantes: 0
 
-Resumen por mes de factura y marca
-2026-05 | Socovesa | refs: 1 | filas: 59 | monto cartola CLP: 600000
+Resumen por marca
 2026-06 | Almagro Inmobiliaria | refs: 6 | filas: 416 | monto cartola CLP: 3600000
 2026-06 | Pilares | refs: 3 | filas: 91 | monto cartola CLP: 1373061
-2026-06 | Socovesa | refs: 5 | filas: 297 | monto cartola CLP: 2676565
+2026-06 | Socovesa | refs: 6 | filas: 356 | monto cartola CLP: 3276565
 
 Referencias
-X3U5MRV6E2 | factura 2026-06 | Almagro Inmobiliaria | pago 2026-06-01 | cartola 01/06/2026 | cartola 600000 | asignado 600000 | filas 74 | OK
-HNNMKRV6E2 | factura 2026-06 | Pilares | pago 2026-06-01 | cartola 01/06/2026 | cartola 173061 | asignado 173061 | filas 30 | OK
-9PMC2TH6E2 | factura 2026-06 | Socovesa | pago 2026-06-01 | cartola 01/06/2026 | cartola 279796 | asignado 279796 | filas 59 | OK
-GXSPZRV5E2 | factura 2026-05 | Socovesa | pago 2026-05-31 | cartola 01/06/2026 | cartola 600000 | asignado 600000 | filas 59 | OK
-MYWKGTZ5E2 | factura 2026-06 | Almagro Inmobiliaria | pago 2026-06-01 | cartola 02/06/2026 | cartola 600000 | asignado 600000 | filas 74 | OK
-QALDZRR6E2 | factura 2026-06 | Pilares | pago 2026-06-01 | cartola 02/06/2026 | cartola 600000 | asignado 600000 | filas 30 | OK
-NW669S56E2 | factura 2026-06 | Socovesa | pago 2026-06-01 | cartola 02/06/2026 | cartola 600000 | asignado 600000 | filas 59 | OK
-M692CTH6E2 | factura 2026-06 | Almagro Inmobiliaria | pago 2026-06-03 | cartola 03/06/2026 | cartola 600000 | asignado 600000 | filas 74 | OK
-PL8PCS56E2 | factura 2026-06 | Almagro Inmobiliaria | pago 2026-06-02 | cartola 03/06/2026 | cartola 600000 | asignado 600000 | filas 74 | OK
-5A4LASV5E2 | factura 2026-06 | Socovesa | pago 2026-06-02 | cartola 03/06/2026 | cartola 600000 | asignado 600000 | filas 60 | OK
-RBA92TM6E2 | factura 2026-06 | Almagro Inmobiliaria | pago 2026-06-04 | cartola 04/06/2026 | cartola 600000 | asignado 600000 | filas 60 | OK
-JMDSCTD6E2 | factura 2026-06 | Pilares | pago 2026-06-03 | cartola 04/06/2026 | cartola 600000 | asignado 600000 | filas 31 | OK
-GWZ2JSV5E2 | factura 2026-06 | Socovesa | pago 2026-06-04 | cartola 04/06/2026 | cartola 600000 | asignado 600000 | filas 59 | OK
-RJ6LESV5E2 | factura 2026-06 | Socovesa | pago 2026-06-03 | cartola 04/06/2026 | cartola 596769 | asignado 596769 | filas 60 | OK
-HQL9HTH6E2 | factura 2026-06 | Almagro Inmobiliaria | pago 2026-06-04 | cartola 05/06/2026 | cartola 600000 | asignado 600000 | filas 60 | OK
+X3U5MRV6E2 | mes 2026-06 | Almagro Inmobiliaria | fecha principal 2026-06-01 | cartola 01/06/2026 | cartola 600000 | asignado 600000 | filas 74 | OK
+HNNMKRV6E2 | mes 2026-06 | Pilares | fecha principal 2026-06-01 | cartola 01/06/2026 | cartola 173061 | asignado 173061 | filas 30 | OK
+9PMC2TH6E2 | mes 2026-06 | Socovesa | fecha principal 2026-06-01 | cartola 01/06/2026 | cartola 279796 | asignado 279796 | filas 59 | OK
+GXSPZRV5E2 | mes 2026-06 | Socovesa | fecha principal 2026-06-01 | cartola 01/06/2026 | cartola 600000 | asignado 600000 | filas 59 | OK
+MYWKGTZ5E2 | mes 2026-06 | Almagro Inmobiliaria | fecha principal 2026-06-02 | cartola 02/06/2026 | cartola 600000 | asignado 600000 | filas 74 | OK
+QALDZRR6E2 | mes 2026-06 | Pilares | fecha principal 2026-06-02 | cartola 02/06/2026 | cartola 600000 | asignado 600000 | filas 30 | OK
+NW669S56E2 | mes 2026-06 | Socovesa | fecha principal 2026-06-02 | cartola 02/06/2026 | cartola 600000 | asignado 600000 | filas 59 | OK
+M692CTH6E2 | mes 2026-06 | Almagro Inmobiliaria | fecha principal 2026-06-03 | cartola 03/06/2026 | cartola 600000 | asignado 600000 | filas 74 | OK
+PL8PCS56E2 | mes 2026-06 | Almagro Inmobiliaria | fecha principal 2026-06-03 | cartola 03/06/2026 | cartola 600000 | asignado 600000 | filas 74 | OK
+5A4LASV5E2 | mes 2026-06 | Socovesa | fecha principal 2026-06-03 | cartola 03/06/2026 | cartola 600000 | asignado 600000 | filas 60 | OK
+RBA92TM6E2 | mes 2026-06 | Almagro Inmobiliaria | fecha principal 2026-06-04 | cartola 04/06/2026 | cartola 600000 | asignado 600000 | filas 60 | OK
+JMDSCTD6E2 | mes 2026-06 | Pilares | fecha principal 2026-06-04 | cartola 04/06/2026 | cartola 600000 | asignado 600000 | filas 31 | OK
+GWZ2JSV5E2 | mes 2026-06 | Socovesa | fecha principal 2026-06-04 | cartola 04/06/2026 | cartola 600000 | asignado 600000 | filas 59 | OK
+RJ6LESV5E2 | mes 2026-06 | Socovesa | fecha principal 2026-06-04 | cartola 04/06/2026 | cartola 596769 | asignado 596769 | filas 60 | OK
+HQL9HTH6E2 | mes 2026-06 | Almagro Inmobiliaria | fecha principal 2026-06-05 | cartola 05/06/2026 | cartola 600000 | asignado 600000 | filas 60 | OK

@@ -1,7 +1,5 @@
-Cruce granular Meta mayo/junio 2026 por campana, proyecto, razon social y fecha cartola
-Correcciones aplicadas desde: /Users/carloscubillos/Downloads/Corregido- meta_cartola_match_mayo_junio_2026_por_campana_proyecto.csv
-Filas corregidas con cartola sin proyecto: 80
-Filas con cartola sin proyecto restantes: 0
+Cruce granular Meta mayo/junio 2026 por campana, proyecto, razon social y fecha principal Meta
+Criterio fecha principal Meta: si existe fecha de cartola, usa cartolaDate; si no existe, usa fecha de factura/pago Meta.
 Filas campana/proyecto: 6226
 
 2026-05 | Almagro Inmobiliaria
@@ -11,7 +9,7 @@ Filas campana/proyecto: 6226
   Match cartola + proyecto: 359 | monto asignado CLP: 7200000
   Sin cartola: 88 | monto asignado CLP: 1202158
 2026-05 | Socovesa
-  Match cartola + proyecto: 1652 | monto asignado CLP: 16790944
+  Match cartola + proyecto: 1593 | monto asignado CLP: 16190944
   Sin cartola: 406 | monto asignado CLP: 3634826
 2026-06 | Almagro Inmobiliaria
   Match cartola + proyecto: 416 | monto asignado CLP: 3600000
@@ -20,5 +18,5 @@ Filas campana/proyecto: 6226
   Match cartola + proyecto: 91 | monto asignado CLP: 1373061
   Sin cartola: 31 | monto asignado CLP: 600000
 2026-06 | Socovesa
-  Match cartola + proyecto: 297 | monto asignado CLP: 2676565
+  Match cartola + proyecto: 356 | monto asignado CLP: 3276565
   Sin cartola: 77 | monto asignado CLP: 603231
