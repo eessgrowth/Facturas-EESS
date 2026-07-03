@@ -460,7 +460,7 @@ function extractRows() {
       const chargeAmountValidation = normalizeText(row.chargeAmountValidation) || "Sin match";
       const pepCode = normalizeText(row.pepCode);
       const amount = Number(row.amount || 0);
-      const reportAmount = platform === "Meta" ? (chargeTcAmount === null ? 0 : chargeTcAmount) : amount;
+      const reportAmount = platform === "Meta" ? (chargeTcAmount === null ? amount : chargeTcAmount) : amount;
       const splitAssignmentsRaw = Array.isArray(row.splitAssignments) ? row.splitAssignments : [];
       const splitAssignments =
         splitAssignmentsRaw.length > 0
