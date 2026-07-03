@@ -171,6 +171,10 @@ PROJECT_LEGAL_ENTITY_OVERRIDES = {
 
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Las Pataguas")] = CANONICAL_ENCINAS_LEGAL_ENTITY
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Los Coihues")] = CANONICAL_ENCINAS_LEGAL_ENTITY
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Edificio \u00d1uble")] = "ICSA"
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Vicu\u00f1a Mackenna 7244")] = "Pilares S.A"
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Edificio V\u00e9rtice")] = "Socovesa Sur S.A"
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Garc\u00eda Reyes")] = "Socovesa Sur S.A"
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Almagro Terra")] = "Almagro S.A"
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Franklin")] = "Arcilla Roja"
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Valle del Mar")] = "Almagro S.A"
@@ -236,11 +240,21 @@ MANUAL_CAMPAIGN_PROJECT_OVERRIDES = {
     normalize_key("Carrera_IV"): ("Santiago", "Carrera 4"),
     normalize_key("Carrera IV"): ("Santiago", "Carrera 4"),
     normalize_key("SanEugenio"): ("Santiago", "San Eugenio 2"),
+    normalize_key("AlmagroTerra"): ("Antofagasta", "Almagro Terra"),
+    normalize_key("Parque Brasil"): ("Antofagasta", "Parque Brasil"),
+    normalize_key("Franklin"): ("Santiago Centro", "Franklin"),
+    normalize_key("GarciaReyes"): ("Valdivia", "Garc\u00eda Reyes"),
+    normalize_key("Garc\u00eda Reyes"): ("Valdivia", "Garc\u00eda Reyes"),
+    normalize_key("EdificioVertice"): ("Temuco", "Edificio V\u00e9rtice"),
+    normalize_key("Edificio V\u00e9rtice"): ("Temuco", "Edificio V\u00e9rtice"),
     normalize_key("VistaNielol"): ("Temuco", "N3"),
     normalize_key("Temuco N3"): ("Temuco", "N3"),
     normalize_key("Inversionistas"): ("Santiago", "Insigne"),
     normalize_key("Vitacura"): ("Vitacura", "Agust\u00edn del Castillo"),
     normalize_key("Plaza Mirador"): ("La Florida", "Plaza Mirador"),
+    normalize_key("Santiago | AO S | Comuna | La Florida"): ("La Florida", "Plaza Mirador"),
+    normalize_key("Portal del Libertador IX"): ("Chill\u00e1n", "PDL"),
+    normalize_key("Costos operativos regulatorios"): ("Coipue", "Coipue"),
     normalize_key("FB_WA_Pilares_Advantage_Proyectos"): ("AON", "Guillermo Mann"),
     normalize_key("FB_WA_SantiagoSubsidio_LasPataguas"): ("Lampa", "Las Pataguas"),
 }
@@ -2285,11 +2299,12 @@ def build_reason_social_rows(
                 comuna = str(sorted_candidates[0].get("comuna", "")).strip() or "Sin asignar"
                 project = str(sorted_candidates[0].get("project", "")).strip() or "Sin asignar"
                 mapping_brand = sorted_candidates[0]["brand"]
-            else:
-                manual_assignment = manual_assignment_by_campaign(campaign_name)
-                if manual_assignment:
-                    legal_entity, comuna, project = manual_assignment
-                    mapping_brand = "Manual"
+            manual_assignment = manual_assignment_by_campaign(campaign_name)
+            if manual_assignment and (
+                not candidates or legal_entity == "Sin asignar" or project == "Sin asignar" or not pep_code_by_project(project)
+            ):
+                legal_entity, comuna, project = manual_assignment
+                mapping_brand = "Manual"
 
             desglose_pool: list[dict[str, Any]] = []
             for alias in brand_group_aliases(brand_group):
@@ -2412,6 +2427,14 @@ def build_reason_social_rows(
         reference_type = campaign_reference_type(platform)
         reference_id = str(invoice.get("id", "")).strip()
         for charge in special_charges:
+            charge_legal_entity = top_legal_entity
+            charge_comuna = top_comuna
+            charge_project = top_project
+            if charge_legal_entity == "Sin asignar":
+                manual_assignment = manual_assignment_by_campaign(charge["label"])
+                if manual_assignment:
+                    charge_legal_entity, charge_comuna, charge_project = manual_assignment
+
             rows.append(
                 {
                     "invoiceId": invoice.get("id", ""),
@@ -2428,24 +2451,24 @@ def build_reason_social_rows(
                     "chargeAmountUsd": None,
                     "chargeAmountValidation": "No aplica" if platform == "Meta" else "Sin match",
                     "chargeTcAmount": None,
-                    "legalEntity": top_legal_entity,
-                    "comuna": top_comuna,
-                    "project": top_project,
-                    "pepCode": pep_code_by_project(top_project),
+                    "legalEntity": charge_legal_entity,
+                    "comuna": charge_comuna,
+                    "project": charge_project,
+                    "pepCode": pep_code_by_project(charge_project),
                     "referenceId": reference_id,
                     "referenceType": reference_type,
                     "mappingBrand": "",
                     "splitAssignments": [
                         {
-                            "legalEntity": top_legal_entity,
-                            "comuna": top_comuna,
-                            "project": top_project,
-                            "pepCode": pep_code_by_project(top_project),
+                            "legalEntity": charge_legal_entity,
+                            "comuna": charge_comuna,
+                            "project": charge_project,
+                            "pepCode": pep_code_by_project(charge_project),
                             "amount": charge["amount"],
                         }
                     ],
                     "splitCount": 1,
-                    "matched": top_legal_entity != "Sin asignar",
+                    "matched": charge_legal_entity != "Sin asignar",
                 }
             )
 
@@ -2587,6 +2610,7 @@ def build_reason_social_rows(
                 if str(row.get("platform", "")).strip() == platform_name
                 and str(row.get("brand", "")).strip() == brand
                 and str(row.get("legalEntity", "")).strip() == target_legal_entity
+                and not is_special_charge_label(str(row.get("campaignName", "")).strip())
             ]
             if not candidate_indexes:
                 continue
@@ -2643,7 +2667,13 @@ def build_reason_social_rows(
                 continue
 
             if invoice_row_indexes:
-                target_idx = max(invoice_row_indexes, key=lambda idx: int(rows[idx].get("amount", 0) or 0))
+                adjustable_indexes = [
+                    idx
+                    for idx in invoice_row_indexes
+                    if not is_special_charge_label(str(rows[idx].get("campaignName", "")).strip())
+                ]
+                target_pool = adjustable_indexes or invoice_row_indexes
+                target_idx = max(target_pool, key=lambda idx: int(rows[idx].get("amount", 0) or 0))
                 rows[target_idx]["amount"] = int(rows[target_idx].get("amount", 0) or 0) + diff
                 continue
 
