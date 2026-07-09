@@ -1,0 +1,19 @@
+Cruce nuevo archivo cartola TC 13-5-2026 vs facturas Meta
+Archivo: Facturas Meta/Cartola TC/TC MovFacturadosInternacionales_94840000-6_13-5-2026.xls
+Rango fechas FACEBK: 2026-04-08 a 2026-05-05
+Cargos FACEBK en cartola: 81
+Total cartola FACEBK: 47400018
+Referencias con factura Meta encontrada: 81
+Total cartola con factura Meta encontrada: 47400018
+Referencias OK en monto + asignación: 81
+Referencias sin factura Meta encontrada: 0
+Total sin factura Meta encontrada: 0
+Referencias con monto no coincidente: 0
+Referencias con razón social/proyecto Sin asignar: 0
+Referencias del XLS que ya están en cardChargesByCode: 81
+Filas no FACEBK revisadas: 4
+Filas no FACEBK:
+ - fila 96: 2026-04-27 | TRASPASO DEUDA INTERNAC | origen=0 | usd=-59360.34
+ - fila 99:  | Monto | origen=0 | usd=
+ - fila 100:  | 54479.53 | origen=0 | usd=
+ - fila 101:  | 05/06/2026 | origen=0 | usd=
