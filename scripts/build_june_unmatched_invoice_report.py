@@ -162,7 +162,11 @@ def parse_june_invoices() -> tuple[list[dict[str, Any]], list[invoice_builder.Pa
     return sorted(invoices, key=lambda item: (item["platform"], item["brand"], item["invoiceDate"])), warnings
 
 
-def expanded_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def expanded_rows(
+    rows: list[dict[str, Any]],
+    month: str = MONTH,
+    cartola_status: str = "Pendiente cartola TC junio completa",
+) -> list[dict[str, Any]]:
     def allocate_proportional_int(total: int, weights: list[int]) -> list[int]:
         if not weights:
             return []
@@ -210,7 +214,7 @@ def expanded_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 continue
             expanded.append(
                 {
-                    "month": MONTH,
+                    "month": month,
                     "platform": row.get("platform", ""),
                     "brand": row.get("brand", ""),
                     "legalEntity": assignment.get("legalEntity", row.get("legalEntity", "")),
@@ -228,7 +232,7 @@ def expanded_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "chargeAmountValidation": row.get("chargeAmountValidation", ""),
                     "matched": row.get("matched", False),
                     "mappingBrand": row.get("mappingBrand", ""),
-                    "cartolaMatchStatus": "Pendiente cartola TC junio completa",
+                    "cartolaMatchStatus": cartola_status,
                 }
             )
     return sorted(
@@ -260,7 +264,7 @@ def summarize(rows: list[dict[str, Any]], keys: list[str]) -> list[dict[str, Any
 def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer = csv.DictWriter(fh, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow({field: row.get(field, "") for field in fieldnames})

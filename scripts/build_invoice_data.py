@@ -257,6 +257,12 @@ MANUAL_CAMPAIGN_PROJECT_OVERRIDES = {
     normalize_key("Costos operativos regulatorios"): ("Coipue", "Coipue"),
     normalize_key("FB_WA_Pilares_Advantage_Proyectos"): ("AON", "Guillermo Mann"),
     normalize_key("FB_WA_SantiagoSubsidio_LasPataguas"): ("Lampa", "Las Pataguas"),
+    normalize_key("Santiago | Demand Gen | Insigne"): ("Macul", "Insigne"),
+    normalize_key("Santiago | MR | Hub"): ("Providencia", "Almagro Hub"),
+    normalize_key("Santiago | Max. Rend. | Por Proyecto | Macul | Coipue"): ("Macul", "Coipue"),
+    normalize_key("FB_AOT_Santiago_AlmagroHub"): ("Providencia", "Almagro Hub"),
+    normalize_key("FB_WA_Almagro_Advantage_Proyectos"): ("AON", "Almagro Hub"),
+    normalize_key("FB_AOT_SantiagoMedio_Coipue"): ("Macul", "Coipue"),
 }
 
 
@@ -309,6 +315,7 @@ def is_special_charge_label(label: str) -> bool:
     return (
         "actividadnovalida" in normalized
         or "costosoperativosregulatorios" in normalized
+        or "couponsgoodwillbugs" in normalized
         or "tarifadelimpuesto" in normalized
         or "tarifasimpuestos" in normalized
     )
@@ -768,7 +775,18 @@ def parse_meta_receipt_pdf(path: Path, warnings: list[ParseWarning], month_hint:
         warnings.append(ParseWarning(source=path.name, message="Could not infer date in Meta receipt PDF."))
         return None
 
-    resolved_month = month_hint or month_key(date_iso)
+    date_month = month_key(date_iso)
+    resolved_month = date_month or month_hint
+    if month_hint and date_month and month_hint != date_month:
+        warnings.append(
+            ParseWarning(
+                source=path.name,
+                message=(
+                    f"Receipt folder month {month_hint} differs from transaction date month {date_month}; "
+                    "using the transaction date."
+                ),
+            )
+        )
     campaigns = parse_meta_receipt_campaigns(lines)
 
     return {
@@ -784,11 +802,123 @@ def parse_meta_receipt_pdf(path: Path, warnings: list[ParseWarning], month_hint:
         "campaigns": campaigns,
     }
 
-def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> list[dict[str, Any]]:
+
+def parse_meta_monthly_invoice_pdf(path: Path, warnings: list[ParseWarning]) -> dict[str, Any] | None:
+    """Parse Meta's NET 30 monthly invoice format with campaign rows."""
+    text = extract_text_pypdf(path)
+    if "Invoice #:" not in text or "Billing Period:" not in text or "Invoice Total:" not in text:
+        return None
+
+    invoice_number_m = re.search(r"Invoice\s*#:\s*(\d+)", text, re.IGNORECASE)
+    invoice_date_m = re.search(r"Invoice Date:\s*(\d{1,2}-[A-Za-z]{3}-\d{4})", text, re.IGNORECASE)
+    billing_period_m = re.search(r"Billing Period:\s*([A-Za-z]{3})-(\d{2})", text, re.IGNORECASE)
+    account_m = re.search(r"Account Id\s*/\s*Group:\s*(\d+)", text, re.IGNORECASE)
+    total_m = re.search(r"Invoice Total:\s*([\d,]+)", text, re.IGNORECASE)
+    if not invoice_number_m or not invoice_date_m or not billing_period_m or not total_m:
+        warnings.append(
+            ParseWarning(source=path.name, message="Could not parse required fields from Meta monthly invoice.")
+        )
+        return None
+
+    invoice_number = invoice_number_m.group(1)
+    invoice_date = datetime.strptime(invoice_date_m.group(1), "%d-%b-%Y").strftime("%Y-%m-%d")
+    billing_month = datetime.strptime(
+        f"{billing_period_m.group(1)}-{billing_period_m.group(2)}", "%b-%y"
+    ).strftime("%Y-%m")
+    total_amount = clp_to_int(total_m.group(1))
+    account_id = account_m.group(1) if account_m else ""
+
+    brand, account_name = normalize_meta_folder_brand(path.parent.parent.name)
+    campaign_totals: dict[str, int] = defaultdict(int)
+    details: list[dict[str, Any]] = []
+    line_re = re.compile(r"^\s*(\d+)\s+(.+?)\s+(-?[\d,]+)\s*$")
+    for raw_line in text.splitlines():
+        line_m = line_re.match(raw_line)
+        if not line_m:
+            continue
+        label = re.sub(r"^Instagram\s+-\s+", "", line_m.group(2).strip(), flags=re.IGNORECASE)
+        if "FB_" not in label and "Coupons" not in label:
+            continue
+        amount = clp_to_int(line_m.group(3))
+        if amount == 0:
+            continue
+        campaign_totals[label] += amount
+        details.append(
+            {
+                "description": label,
+                "lineNumber": int(line_m.group(1)),
+                "amount": amount,
+            }
+        )
+
+    detail_total = sum(int(item.get("amount", 0) or 0) for item in details)
+    if detail_total != total_amount:
+        warnings.append(
+            ParseWarning(
+                source=path.name,
+                message=f"Monthly invoice detail sum ({detail_total}) does not match total ({total_amount}).",
+            )
+        )
+
+    campaigns = sorted(
+        (
+            {"name": campaign_name, "amount": amount}
+            for campaign_name, amount in campaign_totals.items()
+            if amount > 0
+        ),
+        key=lambda item: (-item["amount"], item["name"]),
+    )
+    document_file = path.relative_to(ROOT).as_posix()
+    folder_month = month_key_from_folder_name(path.parent.name)
+    if folder_month and folder_month != billing_month:
+        warnings.append(
+            ParseWarning(
+                source=path.name,
+                message=(
+                    f"Monthly invoice folder month {folder_month} differs from billing period {billing_month}; "
+                    "using the billing period."
+                ),
+            )
+        )
+    notes = [
+        "Factura mensual Meta NET 30 asignada según su período de facturación; los comprobantes del mismo mes se incorporan por separado según su fecha de transacción."
+    ]
+    if brand == "Almagro Inmobiliaria":
+        notes.append("Meta agrupa esta cuenta como ALMAGRO S A y no separa Inmobiliaria/Propiedades.")
+
+    return {
+        "id": invoice_number,
+        "sourceFile": document_file,
+        "pdfFile": document_file,
+        "documentFile": document_file,
+        "platform": "Meta",
+        "brand": brand,
+        "month": billing_month,
+        "invoiceDate": invoice_date,
+        "periodStart": f"{billing_month}-01",
+        "periodEnd": last_day_of_month(billing_month),
+        "dueDate": "",
+        "currency": "CLP",
+        "accountName": account_name,
+        "accountId": account_id,
+        "totalAmount": total_amount,
+        "summaryBreakdown": [{"label": "Invoice Total", "amount": total_amount}],
+        "details": details,
+        "campaigns": campaigns,
+        "notes": notes,
+    }
+
+
+def parse_meta_receipt_folders(
+    root_dir: Path,
+    warnings: list[ParseWarning],
+    month_filter: str | None = None,
+) -> list[dict[str, Any]]:
     if not root_dir.exists():
         return []
 
     grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
+    monthly_invoices: list[dict[str, Any]] = []
 
     def append_parsed_receipt(
         *,
@@ -893,8 +1023,25 @@ def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> 
             if not month_dir.is_dir():
                 continue
             month_hint = month_key_from_folder_name(month_dir.name)
+            if month_filter and month_hint != month_filter:
+                continue
+
+            formal_invoice_files = [
+                pdf_file
+                for pdf_file in sorted(month_dir.glob("*.pdf"))
+                if "facturamensual" in normalize_key(pdf_file.name)
+            ]
+            parsed_formal_invoices = [
+                parsed
+                for pdf_file in formal_invoice_files
+                if (parsed := parse_meta_monthly_invoice_pdf(pdf_file, warnings)) is not None
+            ]
+            if parsed_formal_invoices:
+                monthly_invoices.extend(parsed_formal_invoices)
 
             for pdf_file in sorted(month_dir.glob("*.pdf")):
+                if pdf_file in formal_invoice_files:
+                    continue
                 append_parsed_receipt(
                     brand=brand,
                     account_name=account_name,
@@ -985,6 +1132,7 @@ def parse_meta_receipt_folders(root_dir: Path, warnings: list[ParseWarning]) -> 
                 "notes": notes,
             }
         )
+    invoices.extend(monthly_invoices)
     return invoices
 
 
