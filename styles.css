@@ -354,6 +354,43 @@ body {
   cursor: pointer;
 }
 
+.rsd-date-range {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rsd-date-range legend {
+  grid-column: 1 / -1;
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.rsd-date-feedback {
+  grid-column: 1 / -1;
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.rsd-date-feedback.is-error {
+  color: #a11d1d;
+  font-weight: 700;
+}
+
+.campaign-filters input:invalid {
+  border-color: #b43a3a;
+  box-shadow: 0 0 0 2px rgba(180, 58, 58, 0.12);
+}
+
 .campaign-bars {
   display: grid;
   gap: 10px;
@@ -544,6 +581,10 @@ th.amount {
     grid-template-columns: 1fr;
   }
 
+  .rsd-date-range {
+    grid-column: 1 / -1;
+  }
+
   .invoice-head {
     flex-direction: column;
   }
@@ -551,5 +592,11 @@ th.amount {
   .btn {
     width: 100%;
     text-align: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .rsd-date-range {
+    grid-template-columns: 1fr;
   }
 }

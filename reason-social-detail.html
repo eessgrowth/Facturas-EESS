@@ -60,6 +60,17 @@
           <label for="rsd-year-filter">Año</label>
           <select id="rsd-year-filter"></select>
         </div>
+        <fieldset class="rsd-date-range">
+          <legend>Rango de fecha de pago</legend>
+          <div class="filter-field">
+            <label for="rsd-date-from">Desde</label>
+            <input id="rsd-date-from" type="date" aria-describedby="rsd-date-feedback" />
+          </div>
+          <div class="filter-field">
+            <label for="rsd-date-to">Hasta</label>
+            <input id="rsd-date-to" type="date" aria-describedby="rsd-date-feedback" />
+          </div>
+        </fieldset>
         <div class="filter-field">
           <label for="rsd-legal-filter">Razón social</label>
           <select id="rsd-legal-filter"></select>
@@ -71,6 +82,7 @@
         <div class="filter-actions">
           <button id="rsd-clear-filters" class="btn btn-secondary" type="button">Limpiar filtros</button>
         </div>
+        <p id="rsd-date-feedback" class="rsd-date-feedback" role="status" aria-live="polite"></p>
       </section>
 
       <section class="panel">

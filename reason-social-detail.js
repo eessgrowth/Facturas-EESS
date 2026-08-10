@@ -7,6 +7,8 @@ const state = {
   brand: "",
   month: "",
   year: "",
+  dateFrom: "",
+  dateTo: "",
   legalEntity: "",
   search: "",
 };
@@ -16,10 +18,13 @@ const controls = {
   brand: document.getElementById("rsd-brand-filter"),
   month: document.getElementById("rsd-month-filter"),
   year: document.getElementById("rsd-year-filter"),
+  dateFrom: document.getElementById("rsd-date-from"),
+  dateTo: document.getElementById("rsd-date-to"),
   legalEntity: document.getElementById("rsd-legal-filter"),
   search: document.getElementById("rsd-search"),
   clear: document.getElementById("rsd-clear-filters"),
 };
+const dateFeedback = document.getElementById("rsd-date-feedback");
 
 const kpiTotal = document.getElementById("rsd-kpi-total");
 const kpiRows = document.getElementById("rsd-kpi-rows");
@@ -134,6 +139,57 @@ function formatDate(value) {
   const [_, year, month, day] = m;
   const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
   return date.toLocaleDateString("es-CL", { timeZone: "UTC" });
+}
+
+function getDateKey(value) {
+  const raw = normalizeText(value);
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+
+  const [, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (
+    date.getUTCFullYear() !== Number(year) ||
+    date.getUTCMonth() !== Number(month) - 1 ||
+    date.getUTCDate() !== Number(day)
+  ) {
+    return "";
+  }
+  return `${year}-${month}-${day}`;
+}
+
+function hasValidDateRange() {
+  return !(state.dateFrom && state.dateTo && state.dateFrom > state.dateTo);
+}
+
+function updateDateFeedback() {
+  const invalidRange = !hasValidDateRange();
+  const validationMessage = invalidRange ? "La fecha desde no puede ser posterior a la fecha hasta." : "";
+
+  controls.dateFrom?.setCustomValidity(validationMessage);
+  controls.dateTo?.setCustomValidity(validationMessage);
+
+  if (!dateFeedback) return;
+  dateFeedback.classList.toggle("is-error", invalidRange);
+  if (invalidRange) {
+    dateFeedback.textContent = validationMessage;
+    return;
+  }
+
+  if (state.dateFrom && state.dateTo) {
+    dateFeedback.textContent = `Rango activo: ${formatDate(state.dateFrom)} al ${formatDate(state.dateTo)} (inclusive).`;
+  } else if (state.dateFrom) {
+    dateFeedback.textContent = `Rango activo: desde ${formatDate(state.dateFrom)} (inclusive).`;
+  } else if (state.dateTo) {
+    dateFeedback.textContent = `Rango activo: hasta ${formatDate(state.dateTo)} (inclusive).`;
+  } else {
+    const availableFrom = controls.dateFrom?.min;
+    const availableTo = controls.dateTo?.max;
+    dateFeedback.textContent =
+      availableFrom && availableTo
+        ? `Rango disponible: ${formatDate(availableFrom)} al ${formatDate(availableTo)}.`
+        : "Selecciona una fecha inicial, final o ambas.";
+  }
 }
 
 function getExportFileBaseName() {
@@ -452,6 +508,7 @@ function extractRows() {
         normalizeText(row.referenceType) || (platform === "Meta" ? "transactionId" : "invoiceNumber");
       const referenceId = normalizeText(row.referenceId || row.invoiceId);
       const paymentDate = normalizeText(row.paymentDate || row.invoiceDate);
+      const dateKey = getDateKey(paymentDate);
       const paymentReference = normalizeText(row.paymentReference);
       const chargeCode = normalizeText(row.chargeCode);
       const chargeTcAmount = toOptionalNumber(row.chargeTcAmount);
@@ -500,6 +557,7 @@ function extractRows() {
         referenceType,
         referenceId: referenceId || "-",
         paymentDate: paymentDate || "-",
+        dateKey,
         paymentReference: paymentReference || "-",
         chargeCode: chargeCode || "-",
         chargeTcAmount,
@@ -531,15 +589,28 @@ function buildFilterOptions() {
     "Todos los años"
   );
   fillSelect(controls.legalEntity, toSortedUnique(allRows.map((row) => row.legalEntity)), "Todas las razones sociales");
+
+  const availableDates = toSortedUnique(allRows.map((row) => row.dateKey)).sort((a, b) => a.localeCompare(b));
+  const minDate = availableDates.at(0) || "";
+  const maxDate = availableDates.at(-1) || "";
+  [controls.dateFrom, controls.dateTo].forEach((control) => {
+    if (!control) return;
+    control.min = minDate;
+    control.max = maxDate;
+  });
+  updateDateFeedback();
 }
 
 function getFilteredRows() {
+  if (!hasValidDateRange()) return [];
   const search = normalizeText(state.search).toLocaleLowerCase("es");
   return allRows.filter((row) => {
     if (state.platform && row.platform !== state.platform) return false;
     if (state.brand && row.brand !== state.brand) return false;
     if (state.month && row.monthKey !== state.month) return false;
     if (state.year && row.year !== state.year) return false;
+    if (state.dateFrom && (!row.dateKey || row.dateKey < state.dateFrom)) return false;
+    if (state.dateTo && (!row.dateKey || row.dateKey > state.dateTo)) return false;
     if (state.legalEntity && row.legalEntity !== state.legalEntity) return false;
 
     if (search) {
@@ -691,6 +762,16 @@ function attachEvents() {
     state.year = event.target.value;
     render(getFilteredRows());
   });
+  controls.dateFrom?.addEventListener("change", (event) => {
+    state.dateFrom = getDateKey(event.target.value);
+    updateDateFeedback();
+    render(getFilteredRows());
+  });
+  controls.dateTo?.addEventListener("change", (event) => {
+    state.dateTo = getDateKey(event.target.value);
+    updateDateFeedback();
+    render(getFilteredRows());
+  });
   controls.legalEntity?.addEventListener("change", (event) => {
     state.legalEntity = event.target.value;
     render(getFilteredRows());
@@ -717,6 +798,8 @@ function attachEvents() {
     state.brand = "";
     state.month = "";
     state.year = "";
+    state.dateFrom = "";
+    state.dateTo = "";
     state.legalEntity = "";
     state.search = "";
 
@@ -724,10 +807,13 @@ function attachEvents() {
     if (controls.brand) controls.brand.value = "";
     if (controls.month) controls.month.value = "";
     if (controls.year) controls.year.value = "";
+    if (controls.dateFrom) controls.dateFrom.value = "";
+    if (controls.dateTo) controls.dateTo.value = "";
     if (controls.legalEntity) controls.legalEntity.value = "";
     if (controls.search) controls.search.value = "";
     expandedRowIds.clear();
 
+    updateDateFeedback();
     render(getFilteredRows());
   });
   exportXlsxBtn?.addEventListener("click", () => {
