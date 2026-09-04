@@ -1,0 +1,16 @@
+Reporte 2026-08 facturas sin match de cartola
+Facturas parseadas: 7
+Total facturas: 112959147
+Total desglose asignado: 112959147
+Filas detalle: 421
+Filas sin asignar: 0
+
+Totales por plataforma:
+- Google Ads: 60202493
+- Meta: 52756654
+
+Warnings:
+- 5684413120_Almagro_Inmobiliaria.pdf: Detail sum (25810087) does not match total (25703053).
+- 5685669288_Almagro_Propiedades.pdf: Detail sum (1587482) does not match total (1573074).
+- 5682710794_Pilares.pdf: Detail sum (10360580) does not match total (10360210).
+- 5684946897_Socovesa.pdf: Detail sum (22628317) does not match total (22566156).

@@ -220,6 +220,7 @@ PROJECT_PEP_CODES = {
     normalize_key("Parque Avellanos"): "I-SUR-2336",
     normalize_key("Nueva Toledo"): "I-SUR-2334",
     normalize_key("Origen"): "I-SUR-2346",
+    normalize_key("Icono"): "I-SUR-2346",
     normalize_key("Edificio Vértice"): "I-SUR-2297",
     normalize_key("O3"): "I-SUR-2373",
     normalize_key("Terraza Mirador"): "I-SUR-2333",
@@ -250,7 +251,7 @@ MANUAL_CAMPAIGN_PROJECT_OVERRIDES = {
     normalize_key("VistaNielol"): ("Temuco", "N3"),
     normalize_key("Temuco N3"): ("Temuco", "N3"),
     normalize_key("Inversionistas"): ("Santiago", "Insigne"),
-    normalize_key("Vitacura"): ("Vitacura", "Agust\u00edn del Castillo"),
+    normalize_key("Vitacura"): ("Vitacura", "Signature"),
     normalize_key("Plaza Mirador"): ("La Florida", "Plaza Mirador"),
     normalize_key("Santiago | AO S | Comuna | La Florida"): ("La Florida", "Plaza Mirador"),
     normalize_key("Portal del Libertador IX"): ("Chill\u00e1n", "PDL"),
@@ -1026,20 +1027,18 @@ def parse_meta_receipt_folders(
             if month_filter and month_hint != month_filter:
                 continue
 
-            formal_invoice_files = [
-                pdf_file
-                for pdf_file in sorted(month_dir.glob("*.pdf"))
-                if "facturamensual" in normalize_key(pdf_file.name)
-            ]
-            parsed_formal_invoices = [
-                parsed
-                for pdf_file in formal_invoice_files
+            pdf_files = sorted(month_dir.glob("*.pdf"))
+            parsed_formal_by_file = {
+                pdf_file: parsed
+                for pdf_file in pdf_files
                 if (parsed := parse_meta_monthly_invoice_pdf(pdf_file, warnings)) is not None
-            ]
+            }
+            formal_invoice_files = set(parsed_formal_by_file)
+            parsed_formal_invoices = list(parsed_formal_by_file.values())
             if parsed_formal_invoices:
                 monthly_invoices.extend(parsed_formal_invoices)
 
-            for pdf_file in sorted(month_dir.glob("*.pdf")):
+            for pdf_file in pdf_files:
                 if pdf_file in formal_invoice_files:
                     continue
                 append_parsed_receipt(
