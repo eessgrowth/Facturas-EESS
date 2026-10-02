@@ -56,6 +56,7 @@ SPANISH_MONTHS = {
     "ago": 8,
     "agosto": 8,
     "sep": 9,
+    "sept": 9,
     "septiembre": 9,
     "oct": 10,
     "octubre": 10,
@@ -66,7 +67,7 @@ SPANISH_MONTHS = {
 }
 
 DATE_DMY_RE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
-DATE_DMONY_RE = re.compile(r"^(\d{1,2})\s+([a-zA-Z]{3})\s+(\d{4})$")
+DATE_DMONY_RE = re.compile(r"^(\d{1,2})\s+([a-zA-Z]{3,10})\s+(\d{4})$")
 META_RECEIPT_DATE_RE = re.compile(r"(\d{1,2})\s+([a-zA-ZÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±\.]+)\s+(\d{4})", re.IGNORECASE)
 FACEBK_CODE_RE = re.compile(r"FACEBK\s*\*([A-Z0-9]{8,12})", re.IGNORECASE)
 STAR_CHARGE_CODE_RE = re.compile(r"\*([A-Z0-9]{8,12})", re.IGNORECASE)
@@ -1529,14 +1530,14 @@ def parse_google_invoice(path: Path, warnings: list[ParseWarning]) -> dict[str, 
     invoice_number_m = re.search(r"NÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºmero de factura:\s*(\d+)", text)
     invoice_number = invoice_number_m.group(1) if invoice_number_m else filename.split("_")[0]
 
-    header_date_m = re.search(r"\.{5,}(\d{1,2}\s+[a-zA-Z]{3}\s+\d{4})", text)
+    header_date_m = re.search(r"\.{5,}(\d{1,2}\s+[a-zA-Z]{3,10}\s+\d{4})", text)
     invoice_date_iso = iso_from_dmony(header_date_m.group(1)) if header_date_m else "1970-01-01"
 
-    due_date_m = re.search(r"Vencimiento:\s*(\d{1,2}\s+[a-zA-Z]{3}\s+\d{4})", text)
+    due_date_m = re.search(r"Vencimiento:\s*(\d{1,2}\s+[a-zA-Z]{3,10}\s+\d{4})", text)
     due_date_iso = iso_from_dmony(due_date_m.group(1)) if due_date_m else ""
 
     period_m = re.search(
-        r"Resumen del\s+(\d{1,2}\s+[a-zA-Z]{3}\s+\d{4})\s*-\s*(\d{1,2}\s+[a-zA-Z]{3}\s+\d{4})",
+        r"Resumen del\s+(\d{1,2}\s+[a-zA-Z]{3,10}\s+\d{4})\s*-\s*(\d{1,2}\s+[a-zA-Z]{3,10}\s+\d{4})",
         text,
     )
     period_start_iso = iso_from_dmony(period_m.group(1)) if period_m else invoice_date_iso
