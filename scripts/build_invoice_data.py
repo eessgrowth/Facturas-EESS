@@ -182,6 +182,7 @@ PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Valle del Mar")] = "Almagro S.A"
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Signature")] = "Almagro S.A"
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Agust\u00edn del Castillo")] = "Almagro SA"
 PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Plaza Mirador")] = "INSOCO"
+PROJECT_LEGAL_ENTITY_OVERRIDES[normalize_key("Mirador de la Frontera")] = "INMOBILIARIA SOCOVESA SUR S.A."
 
 PROJECT_PEP_CODES = {
     normalize_key("Insigne"): "I-ALM-2157",
@@ -235,6 +236,7 @@ PROJECT_PEP_CODES[normalize_key("Edificio V\u00e9rtice")] = "I-SUR-2297"
 PROJECT_PEP_CODES[normalize_key("Plaza Mirador")] = "I-STG-2391"
 PROJECT_PEP_CODES[normalize_key("Valle del Mar")] = "I-ALM-1453"
 PROJECT_PEP_CODES[normalize_key("Signature")] = "I-ALM-2354"
+PROJECT_PEP_CODES[normalize_key("Mirador de la Frontera")] = "I-SUR-2346"
 
 MANUAL_CAMPAIGN_PROJECT_OVERRIDES = {
     normalize_key("ValleDelMar"): ("Antofagasta", "Valle del Mar"),
@@ -259,6 +261,8 @@ MANUAL_CAMPAIGN_PROJECT_OVERRIDES = {
     normalize_key("Costos operativos regulatorios"): ("Coipue", "Coipue"),
     normalize_key("FB_WA_Pilares_Advantage_Proyectos"): ("AON", "Guillermo Mann"),
     normalize_key("FB_WA_SantiagoSubsidio_LasPataguas"): ("Lampa", "Las Pataguas"),
+    normalize_key("Socovesa Santiago | Max. Rend. | Las Pataguas"): ("Lampa", "Las Pataguas"),
+    normalize_key("Sur | Max. Rend. | Por Proyecto | Temuco | Mirador De La Frontera"): ("Temuco", "Mirador de la Frontera"),
     normalize_key("Santiago | Demand Gen | Insigne"): ("Macul", "Insigne"),
     normalize_key("Santiago | MR | Hub"): ("Providencia", "Almagro Hub"),
     normalize_key("Santiago | Max. Rend. | Por Proyecto | Macul | Coipue"): ("Macul", "Coipue"),
